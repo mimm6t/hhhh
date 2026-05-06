@@ -1,14 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.HMA" parent="Theme.Material3.DayNight">
+    <style name="Theme.HMA" parent="Theme.AppCompat.DayNight">
         <item name="colorPrimary">@color/purple_500</item>
-        <item name="colorOnPrimary">@color/white</item>
-        <item name="colorSecondary">@color/teal_200</item>
-        <item name="colorOnSecondary">@color/black</item>
-        <item name="colorError">@color/red_600</item>
-        <item name="colorOnError">@color/white</item>
-        <item name="colorSurface">@color/white</item>
-        <item name="colorOnSurface">@color/black</item>
+        <item name="colorPrimaryDark">@color/purple_700</item>
+        <item name="colorAccent">@color/teal_200</item>
         <item name="android:statusBarColor">@color/purple_700</item>
     </style>
 </resources>
