@@ -1,8 +1,8 @@
 # Hide-My-Applist Rust
 
-![Build](https://github.com/YOUR_USERNAME/hide-my-applist-rust/workflows/Build/badge.svg)
-![Test](https://github.com/YOUR_USERNAME/hide-my-applist-rust/workflows/Test/badge.svg)
-![Release](https://github.com/YOUR_USERNAME/hide-my-applist-rust/workflows/Release/badge.svg)
+![Build](https://github.com/mimm6t/hhhh/workflows/Build/badge.svg)
+![Check](https://github.com/mimm6t/hhhh/workflows/Check/badge.svg)
+![Release](https://github.com/mimm6t/hhhh/workflows/Release/badge.svg)
 
 基于 wxshadow 内核模块的应用列表隐藏工具 - Hide-My-Applist 的 Rust 重写版本
 
