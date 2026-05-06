@@ -16,7 +16,7 @@ pub extern "system" fn Java_com_hma_native_HmaCore_init(
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_hma_native_HmaCore_installHook(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     config_json: JString
 ) -> jint {
@@ -59,7 +59,7 @@ pub extern "system" fn Java_com_hma_native_HmaCore_uninstallHook(
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_hma_native_HmaCore_getStatus(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass
 ) -> jstring {
     let status = r#"{"active":true,"filter_count":0}"#;
