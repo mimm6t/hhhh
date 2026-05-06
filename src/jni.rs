@@ -50,7 +50,7 @@ pub extern "system" fn Java_com_hma_native_HmaCore_uninstallHook(
     _class: JClass
 ) -> jint {
     unsafe {
-        if let Some(mut engine) = ENGINE.take() {
+        if let Some(mut engine) = (&raw mut ENGINE).read().take() {
             let _ = engine.uninstall_hooks();
         }
     }
