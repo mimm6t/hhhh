@@ -15,11 +15,10 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: aarch64-linux-android
-          override: true
+        run: |
+          rustup update stable
+          rustup default stable
+          rustup target add aarch64-linux-android
       
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
@@ -37,7 +36,7 @@ jobs:
       
       - name: Build Rust Library
         run: |
-          export ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}
+          export ANDROID_NDK_HOME=$ANDROID_NDK_ROOT
           cargo build --release --target aarch64-linux-android --features android
       
       - name: Upload Rust Library
@@ -78,12 +77,6 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
-      
-      - name: Sign APK
-        if: github.event_name != 'pull_request'
-        run: |
-          cd android/app/build/outputs/apk/release
-          # TODO: Add signing configuration
       
       - name: Upload APK
         uses: actions/upload-artifact@v4
