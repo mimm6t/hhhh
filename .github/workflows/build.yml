@@ -27,7 +27,7 @@ jobs:
           ndk-version: r26b
       
       - name: Cache Cargo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -41,7 +41,7 @@ jobs:
           cargo build --release --target aarch64-linux-android --features android
       
       - name: Upload Rust Library
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: rust-library
           path: target/aarch64-linux-android/release/libhide_my_applist_rust.so
@@ -60,13 +60,13 @@ jobs:
           java-version: '17'
       
       - name: Download Rust Library
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: rust-library
           path: android/app/src/main/jniLibs/arm64-v8a/
       
       - name: Cache Gradle
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
@@ -86,7 +86,7 @@ jobs:
           # TODO: Add signing configuration
       
       - name: Upload APK
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: android/app/build/outputs/apk/release/app-release.apk
