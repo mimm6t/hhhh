@@ -2,12 +2,11 @@
 use jni::JNIEnv;
 use jni::objects::{JClass, JString};
 use jni::sys::{jint, jboolean, jstring};
-use std::ffi::{CString, CStr};
 use crate::{Config, PmsHookEngine};
 
 static mut ENGINE: Option<PmsHookEngine> = None;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_hma_native_HmaCore_init(
     _env: JNIEnv,
     _class: JClass
@@ -15,13 +14,13 @@ pub extern "system" fn Java_com_hma_native_HmaCore_init(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_hma_native_HmaCore_installHook(
     env: JNIEnv,
     _class: JClass,
     config_json: JString
 ) -> jint {
-    let config_str: String = match env.get_string(config_json) {
+    let config_str: String = match env.get_string(&config_json) {
         Ok(s) => s.into(),
         Err(_) => return -1,
     };
@@ -45,7 +44,7 @@ pub extern "system" fn Java_com_hma_native_HmaCore_installHook(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_hma_native_HmaCore_uninstallHook(
     _env: JNIEnv,
     _class: JClass
@@ -58,7 +57,7 @@ pub extern "system" fn Java_com_hma_native_HmaCore_uninstallHook(
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_hma_native_HmaCore_getStatus(
     env: JNIEnv,
     _class: JClass
@@ -68,7 +67,7 @@ pub extern "system" fn Java_com_hma_native_HmaCore_getStatus(
     output.into_raw()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_hma_native_HmaCore_testWxshadow(
     _env: JNIEnv,
     _class: JClass

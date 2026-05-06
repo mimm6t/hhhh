@@ -1,6 +1,6 @@
 /// Symbol resolution for Android libraries
 use crate::elf;
-use crate::process::{parse_maps, MemoryMap};
+use crate::process::parse_maps;
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 

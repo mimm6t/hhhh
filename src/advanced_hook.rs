@@ -3,7 +3,7 @@
 /// Demonstrates how to hook PMS methods using inline hooks and trampolines
 
 use crate::wxshadow::{self, arm64};
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 /// Inline hook implementation
 pub struct InlineHook {
