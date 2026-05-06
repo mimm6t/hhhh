@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.hma"
+    namespace = "com.hma.rust"
     compileSdk = 34
 
     defaultConfig {
