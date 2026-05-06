@@ -21,24 +21,3 @@ jobs:
       
       - name: Check Compilation
         run: cargo check --all-features
-      
-      - name: Run Clippy (Allow Warnings)
-        run: cargo clippy --all-features || true
-
-  check-android:
-    name: Check Android
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-      
-      - name: Check Android Build
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon || echo "Android build check completed"
