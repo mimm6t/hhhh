@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: aarch64-linux-android
+      
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26b
+      
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      
+      - name: Build Rust Library
+        run: |
+          export ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}
+          cargo build --release --target aarch64-linux-android --features android
+          cp target/aarch64-linux-android/release/libhide_my_applist_rust.so \
+             android/app/src/main/jniLibs/arm64-v8a/
+      
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
+      
+      - name: Get Version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            android/app/build/outputs/apk/release/app-release.apk
+            target/aarch64-linux-android/release/libhide_my_applist_rust.so
+          body: |
+            ## Hide-My-Applist Rust ${{ steps.version.outputs.VERSION }}
+            
+            ### 下载
+            - **app-release.apk** - Android 应用
+            - **libhide_my_applist_rust.so** - Rust 核心库
+            
+            ### 安装
+            1. 加载 wxshadow.kpm 内核模块
+            2. 安装 APK
+            3. 打开应用配置
+            
+            ### 更新日志
+            查看 [CHANGELOG.md](CHANGELOG.md)
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

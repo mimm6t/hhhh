@@ -1,0 +1,47 @@
+name: Test
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test-rust:
+    name: Test Rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      
+      - name: Run Tests
+        run: cargo test --all-features
+      
+      - name: Run Clippy
+        run: cargo clippy -- -D warnings
+      
+      - name: Check Format
+        run: cargo fmt -- --check
+
+  test-android:
+    name: Test Android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      
+      - name: Run Android Tests
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew test

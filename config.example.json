@@ -1,0 +1,37 @@
+{
+  "config_version": 1,
+  "detail_log": true,
+  "max_log_size": 1024,
+  "scope": {
+    "com.example.detector": {
+      "use_whitelist": false,
+      "exclude_system_apps": true,
+      "extra_app_list": [
+        "com.topjohnwu.magisk",
+        "de.robv.android.xposed.installer",
+        "org.lsposed.manager"
+      ],
+      "apply_templates": [
+        "root_tools"
+      ]
+    }
+  },
+  "templates": {
+    "root_tools": {
+      "name": "Root Tools",
+      "app_list": [
+        "com.topjohnwu.magisk",
+        "me.weishu.kernelsu",
+        "me.bmax.apatch"
+      ]
+    },
+    "xposed_modules": {
+      "name": "Xposed Modules",
+      "app_list": [
+        "de.robv.android.xposed.installer",
+        "org.lsposed.manager",
+        "icu.nullptr.hidemyapplist"
+      ]
+    }
+  }
+}
