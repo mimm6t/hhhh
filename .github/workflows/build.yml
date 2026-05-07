@@ -36,6 +36,11 @@ jobs:
       with:
         python-version: '3.11'
     
+    - name: Create NDK symlink
+      run: |
+        mkdir -p ~/Android/Sdk
+        ln -s ${{ steps.setup-ndk.outputs.ndk-path }} ~/Android/Sdk/ndk
+    
     - name: Build loader
       run: |
         export ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}
