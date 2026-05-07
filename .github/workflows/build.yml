@@ -77,14 +77,14 @@ jobs:
         export AR_aarch64_linux_android=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
         cd rustFrida-master && cargo build -p rust_frida --release
     
+    - name: Install cargo-ndk
+      run: cargo install cargo-ndk
+    
     - name: Build Web UI
       run: |
-        export ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}
-        export CC_aarch64_linux_android=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
-        export AR_aarch64_linux_android=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
-        export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
-        cd webui && cargo build --release --target aarch64-linux-android
-        ls -lh target/aarch64-linux-android/release/rustfrida-webui
+        cd webui
+        cargo ndk -t arm64-v8a build --release
+        ls -lh target/aarch64-linux-android/release/rustfrida-webui || (echo "Build failed!" && exit 1)
     
     - name: Package module
       run: |
