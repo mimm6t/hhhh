@@ -1,38 +1,6 @@
-# Rust
-/target/
-**/*.rs.bk
-Cargo.lock
-
-# Android
-*.iml
-.gradle
-/local.properties
-/.idea/
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-*.apk
-*.ap_
-*.aab
-
-# Android Studio
-*.iml
-.idea/
-.gradle/
-local.properties
+build/
+rustFrida-master/
+*.zip
 *.log
-
-# JNI
-*.so
-*.a
-
-# Backup
-*~
-*.swp
-*.swo
-
-# OS
+*.pid
 .DS_Store
-Thumbs.db

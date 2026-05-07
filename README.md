@@ -1,309 +1,131 @@
-# Hide-My-Applist Rust
+# rustFrida KernelSU Module
 
-![Build](https://github.com/mimm6t/hhhh/workflows/Build/badge.svg)
-![Check](https://github.com/mimm6t/hhhh/workflows/Check/badge.svg)
-![Release](https://github.com/mimm6t/hhhh/workflows/Release/badge.svg)
+将 [rustFrida](https://github.com/suifei/rustFrida) 打包为 KernelSU/Magisk/APatch 模块，开机自动启动 rustfrida server 模式。
 
-基于 wxshadow 内核模块的应用列表隐藏工具 - Hide-My-Applist 的 Rust 重写版本
+## 特性
 
-## 项目简介
+- ✅ 开机自动启动 rustfrida server
+- ✅ HTTP RPC API (默认端口 27042)
+- ✅ 支持属性伪装 (--profile)
+- ✅ 支持 spawn 模式注入
+- ✅ 支持 eBPF SO 监控
+- ✅ 内置 REPL 和脚本执行
+- ✅ 支持 KernelSU/Magisk/APatch
 
-这是 [Hide-My-Applist](https://github.com/Dr-TSNG/Hide-My-Applist) 的重写版本，使用 **wxshadow 内核模块** 和 **Rust** 实现，相比原版 Xposed 方案具有以下优势：
+## 安装
 
-- ✅ **内核级别隐藏**：Hook 在内核层，用户态无法检测
-- ✅ **无痕 Hook**：利用 W^X Shadow 技术，内存校验无法发现修改
-- ✅ **更高性能**：Rust 实现，零成本抽象
-- ✅ **更强稳定性**：不依赖 Xposed 框架
+1. 从 [Releases](../../releases) 下载 `rustFrida-KernelSU-x.x.x.zip`
+2. 在 KernelSU/Magisk 管理器中安装
+3. 重启设备
 
-**当前状态：**
-- ✅ 核心功能完成（Rust 库 + 命令行工具）
-- ⏳ Android UI 开发中（详见 [ANDROID_UI_PLAN.md](ANDROID_UI_PLAN.md)）
-
-**临时使用方式：** 命令行工具 + 配置文件
-
-## 技术架构
-
-```
-┌─────────────────────────────────────────┐
-│     Hide-My-Applist Rust                │
-│  ┌───────────────────────────────────┐  │
-│  │  配置管理 (config.rs)              │  │
-│  └───────────────────────────────────┘  │
-│  ┌───────────────────────────────────┐  │
-│  │  Hook 引擎 (hook.rs)               │  │
-│  │  - PMS Hook                        │  │
-│  │  - Binder Hook                     │  │
-│  └───────────────────────────────────┘  │
-│  ┌───────────────────────────────────┐  │
-│  │  wxshadow 接口 (wxshadow.rs)       │  │
-│  │  - prctl 封装                      │  │
-│  │  - ARM64 指令生成                  │  │
-│  └───────────────────────────────────┘  │
-└─────────────────────────────────────────┘
-              ↓ prctl syscall
-┌─────────────────────────────────────────┐
-│      wxshadow.kpm (内核模块)            │
-│  - W^X Shadow Memory                    │
-│  - 断点处理                             │
-│  - 页面切换                             │
-└─────────────────────────────────────────┘
-```
-
-## 核心技术：W^X Shadow
-
-wxshadow 通过内核级别的页面切换实现无痕 Hook：
-
-1. **Shadow Page**：为目标代码页创建副本，写入 Hook 代码
-2. **读写分离**：
-   - 读取时：返回原始页内容（`r--` 权限）
-   - 执行时：使用 Shadow 页（`--x` 权限）
-3. **无痕效果**：内存校验读取到的是原始内容，无法发现 Hook
-
-## 依赖要求
-
-### 必需
-- **KernelPatch** 或 **APatch**：用于加载内核模块
-- **wxshadow.kpm**：W^X Shadow 内核模块
-- **Root 权限**：需要操作内核和系统进程
-
-### 可选
-- **rustFrida**：用于更高级的 Hook 功能
-
-## 编译
+## 验证
 
 ```bash
-# 安装 Rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+# 检查进程
+adb shell ps | grep rustfrida
 
-# 克隆项目
-cd /path/to/hide-my-applist-rust
-
-# 编译
-cargo build --release
-
-# 编译 Android 版本（需要 NDK）
-cargo build --release --target aarch64-linux-android
+# 测试 RPC
+adb shell curl http://127.0.0.1:27042/sessions
 ```
 
-## 使用方法
+## 配置
 
-### 1. 准备工作
+编辑 `/data/adb/modules/rustfrida-kernelsu/config/server.conf`:
 
 ```bash
-# 加载 wxshadow 内核模块
-adb push wxshadow.kpm /data/local/tmp/
-adb shell su -c "kpatch module load /data/local/tmp/wxshadow.kpm"
-
-# 推送程序到设备
-adb push target/aarch64-linux-android/release/hma-rust /data/local/tmp/
-adb shell chmod +x /data/local/tmp/hma-rust
+RPC_PORT=27042
+LISTEN_ADDR=0.0.0.0
+# PROFILE=default
+# VERBOSE=1
 ```
 
-### 2. 配置
-
-创建配置文件 `config.json`：
-
-```json
-{
-  "config_version": 1,
-  "detail_log": true,
-  "max_log_size": 1024,
-  "scope": {
-    "com.example.detector": {
-      "use_whitelist": false,
-      "exclude_system_apps": true,
-      "extra_app_list": [
-        "com.topjohnwu.magisk",
-        "de.robv.android.xposed.installer"
-      ],
-      "apply_templates": ["root_tools"]
-    }
-  },
-  "templates": {
-    "root_tools": {
-      "name": "Root Tools",
-      "app_list": [
-        "com.topjohnwu.magisk",
-        "me.weishu.kernelsu",
-        "me.bmax.apatch"
-      ]
-    }
-  }
-}
+重启服务:
+```bash
+adb shell sh /data/adb/modules/rustfrida-kernelsu/action.sh
 ```
 
-### 3. 运行
+## 使用
+
+### RPC API
 
 ```bash
-# 测试 wxshadow 是否可用
-adb shell su -c "/data/local/tmp/hma-rust test"
+# 列出 sessions
+curl http://127.0.0.1:27042/sessions
 
-# 安装 Hook
-adb shell su -c "/data/local/tmp/hma-rust install /data/local/tmp/config.json"
-
-# 卸载 Hook
-adb shell su -c "/data/local/tmp/hma-rust uninstall"
+# 调用 RPC 方法
+curl -X POST http://127.0.0.1:27042/rpc/0/methodName \
+  -H "Content-Type: application/json" \
+  -d '[arg1, arg2]'
 ```
 
-## 配置说明
-
-### 全局配置
-
-- `config_version`: 配置版本号
-- `detail_log`: 是否启用详细日志
-- `max_log_size`: 最大日志大小（KB）
-
-### Scope 配置
-
-为每个需要隐藏应用列表的应用配置规则：
-
-```json
-"com.example.app": {
-  "use_whitelist": false,        // false=黑名单模式，true=白名单模式
-  "exclude_system_apps": true,   // 是否排除系统应用
-  "extra_app_list": [...],       // 额外的应用列表
-  "apply_templates": [...]       // 应用的模板
-}
-```
-
-### 模板
-
-定义可复用的应用列表：
-
-```json
-"root_tools": {
-  "name": "Root Tools",
-  "app_list": [
-    "com.topjohnwu.magisk",
-    "me.weishu.kernelsu"
-  ]
-}
-```
-
-## 工作原理
-
-### Hook 流程
-
-1. **定位目标**：找到 `system_server` 进程
-2. **解析内存**：读取 `/proc/[pid]/maps` 找到目标库
-3. **设置 Hook**：使用 wxshadow 在关键函数设置断点或 patch
-4. **拦截调用**：当应用查询应用列表时触发 Hook
-5. **过滤结果**：根据配置过滤返回的应用列表
-
-### Hook 目标
-
-根据 Android 版本选择不同的 Hook 点：
-
-- **Android 14+**: `AppsFilterImpl.shouldFilterApplication()`
-- **Android 13**: `Computer.getPackagesForUid()`
-- **Android 11-12**: `PackageManagerService` 相关方法
-- **Android 9-10**: `getInstalledPackages()` 等
-
-## 开发状态
-
-### 已完成
-- [x] wxshadow FFI 封装
-- [x] 配置管理模块
-- [x] 进程和内存工具
-- [x] Hook 引擎框架
-- [x] 命令行工具
-
-### 进行中
-- [ ] rustFrida 集成
-- [ ] PMS 方法地址定位
-- [ ] 实际 Hook 实现
-- [ ] 多版本适配
-
-### 计划中
-- [ ] GUI 配置工具
-- [ ] 自动更新机制
-- [ ] 性能优化
-- [ ] 完整测试
-
-## 与原版对比
-
-| 特性 | 原版 (Xposed) | Rust 版 (wxshadow) |
-|------|---------------|-------------------|
-| Hook 层级 | 用户态 Java | 内核态 |
-| 检测难度 | 容易 | 极难 |
-| 内存扫描 | 可检测 | 不可检测 |
-| 依赖框架 | Xposed/LSPosed | KernelPatch |
-| 性能 | 中等 | 高 |
-| 稳定性 | 依赖框架 | 独立稳定 |
-
-## 注意事项
-
-1. **需要 Root**：必须有 root 权限才能使用
-2. **内核模块**：必须先加载 wxshadow.kpm
-3. **兼容性**：目前仅支持 ARM64 架构
-4. **实验性**：项目仍在开发中，可能不稳定
-
-## 故障排除
-
-### wxshadow 不可用
+### 手动注入
 
 ```bash
-# 检查内核模块是否加载
-adb shell su -c "kpatch module list"
+# 进入 server REPL
+/data/adb/modules/rustfrida-kernelsu/bin/rustfrida --server
 
-# 查看内核日志
-adb shell su -c "dmesg | grep wxshadow"
+# PID 注入
+/data/adb/modules/rustfrida-kernelsu/bin/rustfrida --pid 1234
+
+# Spawn 模式
+/data/adb/modules/rustfrida-kernelsu/bin/rustfrida --spawn com.example.app
 ```
 
-### Hook 失败
+## 架构支持
+
+目前仅支持 **arm64** (rustFrida 上游限制)
+
+## 构建
 
 ```bash
-# 检查 system_server 进程
-adb shell ps -A | grep system_server
+# 克隆仓库
+git clone https://github.com/mimm6t/hhhh.git
+cd hhhh
 
-# 查看详细日志
-adb shell su -c "/data/local/tmp/hma-rust install /data/local/tmp/config.json"
+# 构建 (需要 Android NDK 和 Rust)
+python3 build.py
 ```
 
-## 参考资料
+## 日志
 
-- [Hide-My-Applist 原版](https://github.com/Dr-TSNG/Hide-My-Applist)
-- [mkpms (wxshadow)](https://github.com/example/mkpms)
-- [KernelPatch](https://github.com/bmax121/KernelPatch)
-- [APatch](https://github.com/bmax121/APatch)
+```bash
+# 查看启动日志
+cat /data/adb/modules/rustfrida-kernelsu/logs/service.log
 
-## 更新日志
+# 查看 rustfrida 输出
+cat /data/adb/modules/rustfrida-kernelsu/logs/rustfrida.log
+```
 
-### v0.2.0 (2026-05-06)
+## 故障排查
 
-**新增功能：**
-- ✅ 完整的 ELF 解析器 (`elf.rs`)
-- ✅ 符号解析系统 (`symbol.rs`)
-- ✅ Android 9-15 版本适配 (`android.rs`)
-- ✅ 实际 PMS Hook 实现 (`pms_hook.rs`)
-- ✅ 符号测试工具 (`symbol-test`)
+### 服务未启动
 
-**改进：**
-- 自动检测 Android 版本
-- 自动解析符号地址
-- 支持多版本 Hook 策略
-- 符号表缓存优化
+```bash
+# 手动启动测试
+/data/adb/modules/rustfrida-kernelsu/bin/rustfrida --server --verbose
+```
 
-**已知问题：**
-- Android 9-10 需要 Java Hook (待实现)
-- 某些 ROM 可能需要手动适配
+### RPC 无法连接
 
-详见 [IMPLEMENTATION.md](IMPLEMENTATION.md)
+```bash
+# 检查端口
+netstat -tlnp | grep 27042
 
-## 许可证
+# 测试本地连接
+curl -v http://127.0.0.1:27042/sessions
+```
 
-GPL-3.0 License
+## 限制
 
-## 免责声明
+- ❌ 仅支持 arm64 架构
+- ❌ 不兼容官方 frida-tools
+- ❌ 二进制较大 (~15MB)
 
-本项目仅供学习和研究使用，请勿用于非法用途。使用本项目产生的一切后果由使用者自行承担。
+## 许可
 
-## 贡献
+基于 rustFrida 项目，遵循其原始许可证。
 
-欢迎提交 Issue 和 Pull Request！
+## 参考
 
-## 致谢
-
-- Hide-My-Applist 原作者
-- wxshadow/mkpms 作者
-- KernelPatch 团队
+- [rustFrida](https://github.com/suifei/rustFrida)
+- [magisk-frida](https://github.com/ViRb3/magisk-frida)

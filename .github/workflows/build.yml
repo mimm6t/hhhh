@@ -1,4 +1,4 @@
-name: Build
+name: Build rustFrida KernelSU Module
 
 on:
   push:
@@ -8,89 +8,83 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-rust:
-    name: Build Rust Library
+  build:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Rust
-        run: |
-          rustup update stable
-          rustup default stable
-          rustup target add aarch64-linux-android
-      
-      - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1
-        id: setup-ndk
-        with:
-          ndk-version: r26b
-      
-      - name: Cache Cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      
-      - name: Build Rust Library
-        env:
-          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-        run: |
-          export CC_aarch64_linux_android="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android30-clang"
-          export AR_aarch64_linux_android="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
-          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="${CC_aarch64_linux_android}"
-          cargo build --release --target aarch64-linux-android --features android
-      
-      - name: Upload Rust Library
-        uses: actions/upload-artifact@v4
-        with:
-          name: rust-library
-          path: target/aarch64-linux-android/release/libhide_my_applist_rust.so
-
-  build-android:
-    name: Build Android APK
-    needs: build-rust
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-      
-      - name: Download Rust Library
-        uses: actions/download-artifact@v4
-        with:
-          name: rust-library
-          path: android/app/src/main/jniLibs/arm64-v8a/
-      
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-      
-      - name: Build APK
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease
-      
-      - name: List build outputs
-        run: |
-          echo "=== Build outputs ==="
-          find android/app/build/outputs -name "*.apk" -type f || echo "No APK files found"
-          ls -la android/app/build/outputs/apk/release/ || echo "Release directory not found"
-      
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release
-          path: android/app/build/outputs/apk/release/*.apk
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Checkout rustFrida
+      uses: actions/checkout@v4
+      with:
+        repository: suifei/rustFrida
+        path: rustFrida-master
+        submodules: recursive
+    
+    - name: Setup Android NDK
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r25c
+        add-to-path: true
+    
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: aarch64-linux-android
+    
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential clang lld
+    
+    - name: Build loader shellcode
+      run: |
+        cd rustFrida-master/loader
+        python3 build_helpers.py
+    
+    - name: Build agent
+      run: |
+        cd rustFrida-master
+        cargo build -p agent --release
+    
+    - name: Build rustfrida
+      run: |
+        cd rustFrida-master
+        cargo build -p rust_frida --release
+    
+    - name: Package module
+      run: |
+        mkdir -p build/tmp
+        cp -r base/* build/tmp/
+        mkdir -p build/tmp/files
+        cp rustFrida-master/target/aarch64-linux-android/release/rustfrida build/tmp/files/
+        chmod +x build/tmp/files/rustfrida
+        cd build/tmp
+        zip -r ../rustFrida-KernelSU-0.16.10.zip .
+        cd ../..
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: rustFrida-KernelSU-Module
+        path: build/rustFrida-KernelSU-0.16.10.zip
+    
+    - name: Create Release
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v0.16.10-${{ github.run_number }}
+        name: rustFrida KernelSU v0.16.10-${{ github.run_number }}
+        files: build/rustFrida-KernelSU-0.16.10.zip
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
