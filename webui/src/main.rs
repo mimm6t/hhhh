@@ -17,7 +17,7 @@ fn main() {
     let server = Server::http("0.0.0.0:8080").unwrap();
     println!("rustFrida Web UI listening on 0.0.0.0:8080");
 
-    for request in server.incoming_requests() {
+    for mut request in server.incoming_requests() {
         let url = request.url().to_string();
         
         let response = if url == "/" {
@@ -31,15 +31,15 @@ fn main() {
             let name = url.trim_start_matches("/api/script/");
             handle_get_script(name)
         } else if url == "/api/script/save" && request.method().as_str() == "POST" {
-            handle_save_script(&request)
+            handle_save_script(&mut request)
         } else if url == "/api/script/delete" && request.method().as_str() == "POST" {
-            handle_delete_script(&request)
+            handle_delete_script(&mut request)
         } else if url == "/api/hooks" {
             handle_get_hooks()
         } else if url == "/api/hook/enable" && request.method().as_str() == "POST" {
-            handle_enable_hook(&request)
+            handle_enable_hook(&mut request)
         } else if url == "/api/hook/disable" && request.method().as_str() == "POST" {
-            handle_disable_hook(&request)
+            handle_disable_hook(&mut request)
         } else if url == "/api/output" {
             Response::from_string(r#"{"output":""}"#)
                 .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap())
@@ -94,7 +94,7 @@ fn handle_get_script(name: &str) -> Response<std::io::Cursor<Vec<u8>>> {
     }
 }
 
-fn handle_save_script(request: &tiny_http::Request) -> Response<std::io::Cursor<Vec<u8>>> {
+fn handle_save_script(request: &mut tiny_http::Request) -> Response<std::io::Cursor<Vec<u8>>> {
     let mut content = String::new();
     if let Err(_) = request.as_reader().read_to_string(&mut content) {
         return Response::from_string(r#"{"success":false}"#)
@@ -114,7 +114,7 @@ fn handle_save_script(request: &tiny_http::Request) -> Response<std::io::Cursor<
         .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap())
 }
 
-fn handle_delete_script(request: &tiny_http::Request) -> Response<std::io::Cursor<Vec<u8>>> {
+fn handle_delete_script(request: &mut tiny_http::Request) -> Response<std::io::Cursor<Vec<u8>>> {
     let mut content = String::new();
     if let Err(_) = request.as_reader().read_to_string(&mut content) {
         return Response::from_string(r#"{"success":false}"#)
@@ -147,7 +147,7 @@ fn handle_get_hooks() -> Response<std::io::Cursor<Vec<u8>>> {
         .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap())
 }
 
-fn handle_enable_hook(request: &tiny_http::Request) -> Response<std::io::Cursor<Vec<u8>>> {
+fn handle_enable_hook(request: &mut tiny_http::Request) -> Response<std::io::Cursor<Vec<u8>>> {
     let mut content = String::new();
     if let Err(_) = request.as_reader().read_to_string(&mut content) {
         return Response::from_string(r#"{"success":false}"#)
@@ -183,7 +183,7 @@ fn handle_enable_hook(request: &tiny_http::Request) -> Response<std::io::Cursor<
         .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap())
 }
 
-fn handle_disable_hook(request: &tiny_http::Request) -> Response<std::io::Cursor<Vec<u8>>> {
+fn handle_disable_hook(request: &mut tiny_http::Request) -> Response<std::io::Cursor<Vec<u8>>> {
     let mut content = String::new();
     if let Err(_) = request.as_reader().read_to_string(&mut content) {
         return Response::from_string(r#"{"success":false}"#)
