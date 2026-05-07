@@ -1,0 +1,68 @@
+name: Build rustFrida KernelSU Module
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Checkout rustFrida
+      uses: actions/checkout@v4
+      with:
+        repository: suifei/rustFrida
+        path: rustFrida-master
+        submodules: recursive
+    
+    - name: Setup NDK
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r25c
+    
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: aarch64-linux-android
+    
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Build loader
+      run: cd rustFrida-master/loader && python3 build_helpers.py
+    
+    - name: Build agent
+      run: cd rustFrida-master && cargo build -p agent --release
+    
+    - name: Build rustfrida
+      run: cd rustFrida-master && cargo build -p rust_frida --release
+    
+    - name: Package module
+      run: |
+        mkdir -p build/tmp/files
+        cp -r base/* build/tmp/
+        cp rustFrida-master/target/aarch64-linux-android/release/rustfrida build/tmp/files/
+        chmod +x build/tmp/files/rustfrida
+        cd build/tmp && zip -r ../rustFrida-KernelSU.zip . && cd ../..
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: rustFrida-KernelSU-Module
+        path: build/rustFrida-KernelSU.zip
+    
+    - name: Release
+      if: github.ref == 'refs/heads/master'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v0.16.10-${{ github.run_number }}
+        files: build/rustFrida-KernelSU.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,6 @@
+id=rustfrida-kernelsu
+name=rustFrida for KernelSU
+version=0.16.10
+versionCode=1610
+author=rustFrida Team
+description=Run rustfrida-server on boot: ⏳ (starting)
