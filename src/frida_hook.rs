@@ -123,7 +123,7 @@ impl FridaHookEngine {
             let module_map = ModuleMap::new();
             if let Some(module) = module_map.find_by_name(lib_name) {
                 if let Some(symbol) = module.find_export_by_name(symbol_name) {
-                    return Some(symbol.address() as u64);
+                    return Some(symbol.address().0 as u64);
                 }
             }
         }

@@ -13,7 +13,7 @@ path = "src/bin/main.rs"
 
 [features]
 default = []
-android = ["jni", "frida-gum"]
+android = ["jni"]
 frida = ["frida-gum"]
 
 [dependencies]
@@ -25,17 +25,11 @@ libc = "0.2"
 log = "0.4"
 env_logger = "0.11"
 
-# Frida Hook Engine (using local path like rustFrida)
-frida-gum = { path = "../rustFrida-master/frida-gum", features = ["invocation-listener", "interceptor"], optional = true }
+# Frida Hook Engine (from crates.io)
+frida-gum = { version = "0.13", features = ["invocation-listener"], optional = true }
 
 # Android JNI
 jni = { version = "0.21", optional = true }
 
-# System calls
-nix = "0.29"
-
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = "0.14"
-
-[build-dependencies]
-cc = "1.0"
