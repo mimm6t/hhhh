@@ -45,6 +45,8 @@ jobs:
       run: |
         NDK_PATH="${{ steps.setup-ndk.outputs.ndk-path }}"
         sed -i "s|/home/wwb/Android/Sdk/ndk/25.0.8775105|${NDK_PATH}|g" rustFrida-master/.cargo/config.toml
+        # Remove problematic rustflags that reference non-existent clang_rt library
+        sed -i '/^rustflags = /d' rustFrida-master/.cargo/config.toml
     
     - name: Build loader
       run: |
