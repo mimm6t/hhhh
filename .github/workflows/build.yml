@@ -41,6 +41,11 @@ jobs:
         mkdir -p ~/Android/Sdk/ndk
         ln -s ${{ steps.setup-ndk.outputs.ndk-path }} ~/Android/Sdk/ndk/r25c
     
+    - name: Fix cargo config
+      run: |
+        NDK_PATH="${{ steps.setup-ndk.outputs.ndk-path }}"
+        sed -i "s|/home/wwb/Android/Sdk/ndk/25.0.8775105|${NDK_PATH}|g" rustFrida-master/.cargo/config.toml
+    
     - name: Build loader
       run: |
         export ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}
