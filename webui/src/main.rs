@@ -295,10 +295,10 @@ fn inject_now(request: &mut tiny_http::Request) -> Response<std::io::Cursor<Vec<
         
         let _ = writeln!(log_file, "[{}] Script exists, starting injection...", timestamp);
         
-        // 先启动应用
+        // 先启动应用（使用 monkey 更可靠）
         let _ = writeln!(log_file, "[{}] Starting app: {}", timestamp, package);
-        let start_result = Command::new("am")
-            .args(&["start", "-n", &format!("{}/.biz.LaunchActivity", package)])
+        let start_result = Command::new("monkey")
+            .args(&["-p", package, "-c", "android.intent.category.LAUNCHER", "1"])
             .output();
         
         match start_result {
