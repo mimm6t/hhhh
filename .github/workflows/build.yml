@@ -16,7 +16,7 @@ jobs:
     - name: Checkout rustFrida
       uses: actions/checkout@v4
       with:
-        repository: suifei/rustFrida
+        repository: kkkbbb/rustFrida
         path: rustFrida-master
         submodules: recursive
     
