@@ -38,8 +38,8 @@ jobs:
     
     - name: Create NDK symlink
       run: |
-        mkdir -p ~/Android/Sdk
-        ln -s ${{ steps.setup-ndk.outputs.ndk-path }} ~/Android/Sdk/ndk
+        mkdir -p ~/Android/Sdk/ndk
+        ln -s ${{ steps.setup-ndk.outputs.ndk-path }} ~/Android/Sdk/ndk/r25c
     
     - name: Build loader
       run: |
