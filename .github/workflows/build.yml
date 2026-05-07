@@ -84,6 +84,7 @@ jobs:
         export AR_aarch64_linux_android=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
         export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
         cd webui && cargo build --release --target aarch64-linux-android
+        ls -lh target/aarch64-linux-android/release/rustfrida-webui
     
     - name: Package module
       run: |
@@ -93,6 +94,8 @@ jobs:
         cp webui/target/aarch64-linux-android/release/rustfrida-webui build/tmp/files/
         chmod +x build/tmp/files/rustfrida
         chmod +x build/tmp/files/rustfrida-webui
+        echo "=== Verifying files ==="
+        ls -lh build/tmp/files/
         cd build/tmp && zip -r ../rustFrida-KernelSU.zip . && cd ../..
     
     - name: Upload artifact
