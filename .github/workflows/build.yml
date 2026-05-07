@@ -31,6 +31,9 @@ jobs:
       with:
         targets: aarch64-linux-android
     
+    - name: Install bpf-linker
+      run: cargo install bpf-linker
+    
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
@@ -59,14 +62,14 @@ jobs:
         export ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}
         export CC_aarch64_linux_android=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
         export AR_aarch64_linux_android=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
-        cd rustFrida-master && cargo build -p agent --release --no-default-features
+        cd rustFrida-master && cargo build -p agent --release
     
     - name: Build rustfrida
       run: |
         export ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}
         export CC_aarch64_linux_android=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
         export AR_aarch64_linux_android=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
-        cd rustFrida-master && cargo build -p rust_frida --release --no-default-features
+        cd rustFrida-master && cargo build -p rust_frida --release
     
     - name: Package module
       run: |
