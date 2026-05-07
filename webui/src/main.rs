@@ -295,12 +295,50 @@ fn inject_now(request: &mut tiny_http::Request) -> Response<std::io::Cursor<Vec<
         
         let _ = writeln!(log_file, "[{}] Script exists, starting injection...", timestamp);
         
+        // 先启动应用
+        let _ = writeln!(log_file, "[{}] Starting app: {}", timestamp, package);
+        let start_result = Command::new("am")
+            .args(&["start", "-n", &format!("{}/.biz.LaunchActivity", package)])
+            .output();
+        
+        match start_result {
+            Ok(out) => {
+                let _ = writeln!(log_file, "[{}] App start result: {}", timestamp, String::from_utf8_lossy(&out.stdout));
+            }
+            Err(e) => {
+                let _ = writeln!(log_file, "[{}] Failed to start app: {}", timestamp, e);
+            }
+        }
+        
+        // 等待应用启动
+        let _ = writeln!(log_file, "[{}] Waiting 3 seconds for app to start...", timestamp);
+        std::thread::sleep(std::time::Duration::from_secs(3));
+        
+        // 获取 PID
+        let pid_result = Command::new("pidof").arg(package).output();
+        
+        let pid = match pid_result {
+            Ok(out) => {
+                let pid_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                let _ = writeln!(log_file, "[{}] Got PID: {}", timestamp, pid_str);
+                if pid_str.is_empty() {
+                    let _ = writeln!(log_file, "[{}] ERROR: App not running", timestamp);
+                    return json_response(r#"{"success":false,"error":"App not running after start"}"#);
+                }
+                pid_str
+            }
+            Err(e) => {
+                let _ = writeln!(log_file, "[{}] ERROR: Failed to get PID: {}", timestamp, e);
+                return json_response(r#"{"success":false,"error":"Failed to get PID"}"#);
+            }
+        };
+        
         let rustfrida_bin = "/data/adb/modules/rustfrida-kernelsu/bin/rustfrida";
-        let args = vec!["--spawn", package, "-l", &script_path];
+        let args = vec!["--pid", &pid, "-l", &script_path];
         
         let _ = writeln!(log_file, "[{}] Command: {} {:?}", timestamp, rustfrida_bin, args);
         
-        // 使用 spawn 模式注入
+        // 使用 attach 模式注入
         let output = Command::new(rustfrida_bin)
             .args(&args)
             .output();
