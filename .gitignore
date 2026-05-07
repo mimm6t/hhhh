@@ -1,6 +1,0 @@
-build/
-rustFrida-master/
-*.zip
-*.log
-*.pid
-.DS_Store
