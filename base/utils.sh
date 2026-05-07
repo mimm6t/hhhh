@@ -1,10 +1,32 @@
 #!/bin/sh
 MODPATH=${0%/*}
 RUSTFRIDA_BIN="$MODPATH/bin/rustfrida"
+WEBUI_SCRIPT="$MODPATH/bin/webui.py"
 PATH="$MODPATH/bin:$PATH:/data/adb/ap/bin:/data/adb/magisk:/data/adb/ksu/bin"
 
 exec 2> $MODPATH/logs/utils.log
 set -x
+
+start_webui_server() {
+  [ ! -f "$WEBUI_SCRIPT" ] && { echo "[-] webui.py not found"; update_status "❌ (missing webui)"; return 1; }
+  [ ! -x "$RUSTFRIDA_BIN" ] && { echo "[-] rustfrida binary not found"; update_status "❌ (missing binary)"; return 1; }
+  
+  # 启动 Web UI（会自动启动 rustfrida）
+  python3 "$WEBUI_SCRIPT" > "$MODPATH/logs/webui.log" 2>&1 &
+  echo $! > "$MODPATH/webui.pid"
+}
+
+check_webui_is_up() {
+  timeout=${1:-4}
+  counter=0
+  while [ $counter -lt $timeout ]; do
+    [ -f "$MODPATH/webui.pid" ] && pid=$(cat "$MODPATH/webui.pid") && kill -0 "$pid" 2>/dev/null && { echo "[-] Web UI running (PID: $pid)"; update_status "✅ (active - WebUI:8080)"; return 0; }
+    counter=$((counter + 1))
+    sleep 1.5
+  done
+  update_status "❌ (failed)"
+  return 1
+}
 
 start_rustfrida_server() {
   [ ! -x "$RUSTFRIDA_BIN" ] && { echo "[-] rustfrida binary not found"; update_status "❌ (missing binary)"; return 1; }

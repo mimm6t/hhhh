@@ -5,6 +5,7 @@
 ## 特性
 
 ✅ 开机自启 rustfrida server  
+✅ **Web UI 管理界面** (端口 8080)  
 ✅ HTTP RPC API (端口 27042)  
 ✅ 支持属性伪装 (--profile)  
 ✅ 支持 spawn/watch-so 注入  
@@ -16,7 +17,30 @@
 2. 在 KernelSU/Magisk 管理器安装
 3. 重启设备
 
-## 验证
+## 使用
+
+### Web UI 界面
+
+安装后自动启动 Web UI 服务：
+
+```
+http://<设备IP>:8080
+```
+
+功能：
+- 启动/停止 rustfrida server
+- 发送命令 (spawn, attach, list)
+- 实时查看输出日志
+- 快捷命令按钮
+
+### 端口转发（电脑访问）
+
+```bash
+adb forward tcp:8080 tcp:8080
+# 浏览器打开 http://localhost:8080
+```
+
+### 验证
 
 ```bash
 adb shell ps | grep rustfrida
