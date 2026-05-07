@@ -77,12 +77,22 @@ jobs:
         export AR_aarch64_linux_android=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
         cd rustFrida-master && cargo build -p rust_frida --release
     
+    - name: Build Web UI
+      run: |
+        export ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}
+        export CC_aarch64_linux_android=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
+        export AR_aarch64_linux_android=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+        export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
+        cd webui && cargo build --release --target aarch64-linux-android
+    
     - name: Package module
       run: |
         mkdir -p build/tmp/files
         cp -r base/* build/tmp/
         cp rustFrida-master/target/aarch64-linux-android/release/rustfrida build/tmp/files/
+        cp webui/target/aarch64-linux-android/release/rustfrida-webui build/tmp/files/
         chmod +x build/tmp/files/rustfrida
+        chmod +x build/tmp/files/rustfrida-webui
         cd build/tmp && zip -r ../rustFrida-KernelSU.zip . && cd ../..
     
     - name: Upload artifact

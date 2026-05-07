@@ -1,18 +1,18 @@
 #!/bin/sh
 MODPATH=${0%/*}
 RUSTFRIDA_BIN="$MODPATH/bin/rustfrida"
-WEBUI_SCRIPT="$MODPATH/bin/webui.py"
+WEBUI_BIN="$MODPATH/bin/rustfrida-webui"
 PATH="$MODPATH/bin:$PATH:/data/adb/ap/bin:/data/adb/magisk:/data/adb/ksu/bin"
 
 exec 2> $MODPATH/logs/utils.log
 set -x
 
 start_webui_server() {
-  [ ! -f "$WEBUI_SCRIPT" ] && { echo "[-] webui.py not found"; update_status "❌ (missing webui)"; return 1; }
+  [ ! -x "$WEBUI_BIN" ] && { echo "[-] rustfrida-webui not found"; update_status "❌ (missing webui)"; return 1; }
   [ ! -x "$RUSTFRIDA_BIN" ] && { echo "[-] rustfrida binary not found"; update_status "❌ (missing binary)"; return 1; }
   
-  # 启动 Web UI（会自动启动 rustfrida）
-  python3 "$WEBUI_SCRIPT" > "$MODPATH/logs/webui.log" 2>&1 &
+  # 启动 Rust Web UI
+  "$WEBUI_BIN" > "$MODPATH/logs/webui.log" 2>&1 &
   echo $! > "$MODPATH/webui.pid"
 }
 
