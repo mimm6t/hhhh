@@ -1,6 +1,6 @@
 # rustFrida KernelSU Module
 
-将 [rustFrida](https://github.com/suifei/rustFrida) 打包为 KernelSU/Magisk 模块，开机自启 server 模式。
+将 [rustFrida](https://github.com/kkkbbb/rustFrida) 打包为 KernelSU/Magisk 模块，开机自启 server 模式。
 
 ## 特性
 
@@ -57,5 +57,5 @@ curl -X POST http://127.0.0.1:27042/rpc/0/method -H "Content-Type: application/j
 
 ## 参考
 
-- [rustFrida](https://github.com/suifei/rustFrida)
+- [rustFrida](https://github.com/kkkbbb/rustFrida)
 - [magisk-frida](https://github.com/ViRb3/magisk-frida)
