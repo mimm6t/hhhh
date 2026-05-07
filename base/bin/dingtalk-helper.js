@@ -13,7 +13,7 @@ console.log("[钉钉助手] 脚本加载中...");
 // ==================== 配置管理 ====================
 var Config = {
     // 虚拟定位
-    enableVirtualLocation: false,
+    enableVirtualLocation: true,  // 默认启用
     latitude: 39.9042,  // 北京天安门
     longitude: 116.4074,
     address: "北京市东城区",
