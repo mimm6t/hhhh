@@ -28,10 +28,34 @@ http://<设备IP>:8080
 ```
 
 功能：
-- 启动/停止 rustfrida server
-- 发送命令 (spawn, attach, list)
-- 实时查看输出日志
-- 快捷命令按钮
+- 📱 **应用列表**: 管理应用 Hook，一键启用/禁用
+- 📝 **Hook 脚本**: 创建/编辑/删除 Hook 脚本
+- 📊 **日志查看**: 实时查看 rustfrida 输出
+- ⚙️ **设置**: 服务控制和配置
+
+### 内置脚本
+
+模块安装后自动包含示例脚本：
+
+#### 1. example-hook.js
+基础 Hook 示例，展示常用模式：
+- Activity 生命周期 Hook
+- 方法参数和返回值修改
+- 类方法枚举
+
+#### 2. dingtalk-helper.js
+**钉钉助手** - 完整功能模块：
+- 📍 虚拟定位: 修改 GPS 位置
+- ⏰ 自动打卡: 自动点击打卡按钮
+- 🎛️ RPC 接口: 支持远程配置
+
+**快速使用**:
+1. Web UI → 应用列表 → 启用钉钉
+2. 选择脚本: `dingtalk-helper.js`
+3. Hook 脚本 → 编辑配置
+4. 启动钉钉即可
+
+详见: [钉钉助手快速开始](https://github.com/mimm6t/hhhh/blob/master/docs/dingtalk-helper.md)
 
 ### 端口转发（电脑访问）
 

@@ -31,6 +31,29 @@ on_install() {
   touch "$MODPATH/skip_mount"
   mkdir -p "$MODPATH/bin" "$MODPATH/logs"
   unzip -ojq "$ZIPFILE" "files/rustfrida" -d "$MODPATH/bin" || abort "! Extract rustfrida failed"
+  
+  # 创建 rustfrida 数据目录
+  mkdir -p /data/adb/rustfrida/scripts
+  mkdir -p /data/adb/rustfrida/logs
+  
+  # 复制示例脚本（如果不存在）
+  if [ ! -f /data/adb/rustfrida/scripts/example-hook.js ]; then
+    cp -f "$MODPATH/bin/example-hook.js" /data/adb/rustfrida/scripts/
+    ui_print "- 已安装示例脚本: example-hook.js"
+  fi
+  
+  if [ ! -f /data/adb/rustfrida/scripts/dingtalk-helper.js ]; then
+    cp -f "$MODPATH/bin/dingtalk-helper.js" /data/adb/rustfrida/scripts/
+    ui_print "- 已安装钉钉助手: dingtalk-helper.js"
+  fi
+  
+  # 初始化配置文件
+  if [ ! -f /data/adb/rustfrida/hooks.json ]; then
+    echo '{"enabled":[],"hooks":{}}' > /data/adb/rustfrida/hooks.json
+  fi
+  
+  ui_print "- Web UI 端口: 8080"
+  ui_print "- 使用 adb forward tcp:8080 tcp:8080 访问"
 }
 
 set_permissions() {
