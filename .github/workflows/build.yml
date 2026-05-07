@@ -83,8 +83,14 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease
       
+      - name: List build outputs
+        run: |
+          echo "=== Build outputs ==="
+          find android/app/build/outputs -name "*.apk" -type f || echo "No APK files found"
+          ls -la android/app/build/outputs/apk/release/ || echo "Release directory not found"
+      
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release
-          path: android/app/build/outputs/apk/release/app-release.apk
+          path: android/app/build/outputs/apk/release/*.apk

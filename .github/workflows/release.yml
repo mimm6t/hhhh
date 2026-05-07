@@ -57,7 +57,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/apk/release/*.apk
             target/aarch64-linux-android/release/libhide_my_applist_rust.so
           body: |
             ## Hide-My-Applist Rust ${{ steps.version.outputs.VERSION }}
