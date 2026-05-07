@@ -31,6 +31,8 @@ on_install() {
   touch "$MODPATH/skip_mount"
   mkdir -p "$MODPATH/bin" "$MODPATH/logs"
   unzip -ojq "$ZIPFILE" "files/rustfrida" -d "$MODPATH/bin" || abort "! Extract rustfrida failed"
+  unzip -ojq "$ZIPFILE" "files/rustfrida-webui" -d "$MODPATH/bin" || abort "! Extract rustfrida-webui failed"
+  ui_print "- Extracted rustfrida and rustfrida-webui"
   
   # 创建 rustfrida 数据目录
   mkdir -p /data/adb/rustfrida/scripts
@@ -59,6 +61,7 @@ on_install() {
 set_permissions() {
   set_perm_recursive "$MODPATH" 0 0 0755 0644
   set_perm "$MODPATH/bin/rustfrida" 0 2000 0755 u:object_r:system_file:s0
+  set_perm "$MODPATH/bin/rustfrida-webui" 0 2000 0755 u:object_r:system_file:s0
 }
 
 print_modname

@@ -8,22 +8,42 @@ exec 2> $MODPATH/logs/utils.log
 set -x
 
 start_webui_server() {
-  [ ! -x "$WEBUI_BIN" ] && { echo "[-] rustfrida-webui not found"; update_status "❌ (missing webui)"; return 1; }
-  [ ! -x "$RUSTFRIDA_BIN" ] && { echo "[-] rustfrida binary not found"; update_status "❌ (missing binary)"; return 1; }
+  echo "[$(date)] Starting Web UI server..."
+  [ ! -x "$WEBUI_BIN" ] && { echo "[-] rustfrida-webui not found at: $WEBUI_BIN"; update_status "❌ (missing webui)"; return 1; }
+  [ ! -x "$RUSTFRIDA_BIN" ] && { echo "[-] rustfrida binary not found at: $RUSTFRIDA_BIN"; update_status "❌ (missing binary)"; return 1; }
+  
+  echo "[+] Found rustfrida-webui: $(ls -lh $WEBUI_BIN)"
+  echo "[+] Starting Web UI on 0.0.0.0:8080..."
   
   # 启动 Rust Web UI
   "$WEBUI_BIN" > "$MODPATH/logs/webui.log" 2>&1 &
   echo $! > "$MODPATH/webui.pid"
+  echo "[+] Web UI started with PID: $(cat $MODPATH/webui.pid)"
 }
 
 check_webui_is_up() {
   timeout=${1:-4}
   counter=0
+  echo "[$(date)] Checking if Web UI is up (timeout: ${timeout}s)..."
   while [ $counter -lt $timeout ]; do
-    [ -f "$MODPATH/webui.pid" ] && pid=$(cat "$MODPATH/webui.pid") && kill -0 "$pid" 2>/dev/null && { echo "[-] Web UI running (PID: $pid)"; update_status "✅ (active - WebUI:8080)"; return 0; }
+    if [ -f "$MODPATH/webui.pid" ]; then
+      pid=$(cat "$MODPATH/webui.pid")
+      if kill -0 "$pid" 2>/dev/null; then
+        echo "[+] Web UI running (PID: $pid)"
+        update_status "✅ (active - WebUI:8080)"
+        return 0
+      else
+        echo "[-] PID $pid not running"
+      fi
+    else
+      echo "[-] webui.pid not found"
+    fi
     counter=$((counter + 1))
     sleep 1.5
   done
+  echo "[-] Web UI failed to start"
+  echo "[-] Checking webui.log:"
+  [ -f "$MODPATH/logs/webui.log" ] && tail -20 "$MODPATH/logs/webui.log"
   update_status "❌ (failed)"
   return 1
 }
