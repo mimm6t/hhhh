@@ -49,6 +49,7 @@ check_webui_is_up() {
 }
 
 start_rustfrida_server() {
+  echo "[$(date)] Starting rustfrida server..."
   [ ! -x "$RUSTFRIDA_BIN" ] && { echo "[-] rustfrida binary not found"; update_status "❌ (missing binary)"; return 1; }
   [ -f "$MODPATH/config/server.conf" ] && . "$MODPATH/config/server.conf"
   RPC_PORT=${RPC_PORT:-27042}
@@ -56,8 +57,13 @@ start_rustfrida_server() {
   ARGS="--server --rpc-port $LISTEN_ADDR:$RPC_PORT"
   [ -n "$PROFILE" ] && ARGS="$ARGS --profile $PROFILE"
   [ -n "$VERBOSE" ] && ARGS="$ARGS --verbose"
-  "$RUSTFRIDA_BIN" $ARGS > "$MODPATH/logs/rustfrida.log" 2>&1 &
+  
+  echo "[+] Starting: $RUSTFRIDA_BIN $ARGS"
+  
+  # 使用 setsid 和 nohup 确保后台运行
+  setsid nohup "$RUSTFRIDA_BIN" $ARGS > "$MODPATH/logs/rustfrida.log" 2>&1 < /dev/null &
   echo $! > "$MODPATH/rustfrida.pid"
+  echo "[+] rustfrida PID: $(cat $MODPATH/rustfrida.pid)"
 }
 
 check_rustfrida_is_up() {

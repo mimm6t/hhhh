@@ -22,10 +22,7 @@ fn main() {
             ("GET", "/api/apps") => get_apps(),
             ("GET", "/api/scripts") => get_scripts(),
             ("GET", "/api/hooks") => get_hooks(),
-            ("GET", "/api/output") => {
-                Response::from_string(r#"{"output":""}"#)
-                    .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap())
-            }
+            ("GET", "/api/output") => get_logs(),
             ("GET", path) if path.starts_with("/api/script/") => {
                 let name = path.trim_start_matches("/api/script/");
                 get_script(name)
@@ -89,6 +86,30 @@ fn get_hooks() -> Response<std::io::Cursor<Vec<u8>>> {
         Ok(content) => json_response(&content),
         Err(_) => json_response(r#"{"enabled":[],"hooks":{}}"#),
     }
+}
+
+fn get_logs() -> Response<std::io::Cursor<Vec<u8>>> {
+    let mut logs = Vec::new();
+    
+    // rustfrida.log - 最后50行
+    if let Ok(content) = fs::read_to_string("/data/adb/modules/rustfrida-kernelsu/logs/rustfrida.log") {
+        let lines: Vec<&str> = content.lines().collect();
+        let start = if lines.len() > 50 { lines.len() - 50 } else { 0 };
+        logs.push(format!("=== rustfrida.log (last 50 lines) ===\n{}", lines[start..].join("\n")));
+    }
+    
+    // auto-hook.log
+    if let Ok(content) = fs::read_to_string("/data/adb/modules/rustfrida-kernelsu/logs/auto-hook.log") {
+        logs.push(format!("\n=== auto-hook.log ===\n{}", content));
+    }
+    
+    // webui.log
+    if let Ok(content) = fs::read_to_string("/data/adb/modules/rustfrida-kernelsu/logs/webui.log") {
+        logs.push(format!("\n=== webui.log ===\n{}", content));
+    }
+    
+    let output = logs.join("\n").replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n");
+    json_response(&format!(r#"{{"output":"{}"}}"#, output))
 }
 
 fn read_body(request: &mut tiny_http::Request) -> Result<String, ()> {

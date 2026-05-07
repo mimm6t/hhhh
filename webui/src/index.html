@@ -33,6 +33,7 @@
     <div class="tabs">
         <button class="tab-btn active" onclick="showTab('apps')">📱 应用</button>
         <button class="tab-btn" onclick="showTab('scripts')">📝 脚本</button>
+        <button class="tab-btn" onclick="showTab('logs')">📊 日志</button>
     </div>
     <div id="apps-tab" class="tab-content active">
         <div class="section">
@@ -54,9 +55,16 @@
             <button class="btn" onclick="hideEditor()">取消</button>
         </div>
     </div>
+    <div id="logs-tab" class="tab-content">
+        <div class="section">
+            <h2>实时日志</h2>
+            <button class="btn" onclick="loadLogs()">刷新</button>
+            <pre id="log-output" style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:4px;height:500px;overflow-y:auto;white-space:pre-wrap;font-family:monospace;font-size:12px;margin-top:10px;">加载中...</pre>
+        </div>
+    </div>
     <script>
         let apps=[], hooks={};
-        function showTab(t){document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active'));document.getElementById(t+'-tab').classList.add('active');event.target.classList.add('active');if(t==='apps')loadApps();if(t==='scripts')loadScripts();}
+        function showTab(t){document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active'));document.getElementById(t+'-tab').classList.add('active');event.target.classList.add('active');if(t==='apps')loadApps();if(t==='scripts')loadScripts();if(t==='logs')loadLogs();}
         async function loadApps(){const r=await fetch('/api/apps');apps=await r.json();const h=await fetch('/api/hooks');hooks=await h.json();renderApps();}
         function renderApps(){const s=document.getElementById('search').value.toLowerCase();const f=apps.filter(a=>a.package.toLowerCase().includes(s));document.getElementById('app-list').innerHTML=f.map(a=>`<div class="app-item"><div><div style="font-weight:500;">${a.name}</div><div style="font-size:12px;color:#666;">${a.package}</div></div><label class="switch"><input type="checkbox" ${hooks.enabled&&hooks.enabled.includes(a.package)?'checked':''} onchange="toggle('${a.package}',this.checked)"><span class="slider"></span></label></div>`).join('');}
         function filterApps(){renderApps();}
@@ -67,7 +75,9 @@
         async function save(){const n=document.getElementById('name').value;const c=document.getElementById('content').value;await fetch('/api/script/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n,content:c})});hideEditor();loadScripts();}
         async function del(n){if(!confirm('删除 '+n+'?'))return;await fetch('/api/script/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})});loadScripts();}
         function hideEditor(){document.getElementById('editor').style.display='none';}
+        async function loadLogs(){const r=await fetch('/api/output');const d=await r.json();document.getElementById('log-output').textContent=d.output||'暂无日志';}
         loadApps();
+        setInterval(loadLogs,3000);
     </script>
 </body>
 </html>
