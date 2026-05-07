@@ -1,0 +1,52 @@
+--- a/quickjs-hook/src/hook_engine_mem.c
++++ b/quickjs-hook/src/hook_engine_mem.c
+@@ -115,7 +115,24 @@ void free_entry(HookEntry* entry) {
+ /* --- Cache flush --- */
+ 
+ void hook_flush_cache(void* start, size_t size) {
+-    __builtin___clear_cache((char*)start, (char*)start + size);
++    /* ARM64 manual cache flush - avoid __clear_cache symbol dependency */
++    char* begin = (char*)start;
++    char* end = (char*)start + size;
++    
++    /* DC CVAU - Data Cache Clean by VA to PoU */
++    for (char* p = begin; p < end; p += 64) {
++        __asm__ __volatile__("dc cvau, %0" : : "r"(p) : "memory");
++    }
++    __asm__ __volatile__("dsb ish" : : : "memory");
++    
++    /* IC IVAU - Instruction Cache Invalidate by VA to PoU */
++    for (char* p = begin; p < end; p += 64) {
++        __asm__ __volatile__("ic ivau, %0" : : "r"(p) : "memory");
++    }
++    __asm__ __volatile__("dsb ish" : : : "memory");
++    __asm__ __volatile__("isb" : : : "memory");
+ }
+ 
+ /* --- wxshadow (two-step shadow page patching) --- */
+@@ -1237,8 +1254,23 @@ static int patch_target(HookEntry* entry, void* target, const uint8_t* jump_buf
+         void* writable = find_rw_sibling(target, (size_t)jump_result);
+         if (writable) {
+             memcpy(writable, jump_buf, (size_t)jump_result);
+-            __builtin___clear_cache((char*)target, (char*)target + jump_result);
+-            __builtin___clear_cache((char*)writable, (char*)writable + jump_result);
++            
++            /* Manual cache flush for both target and writable addresses */
++            char* addrs[] = {(char*)target, (char*)writable};
++            for (int i = 0; i < 2; i++) {
++                char* begin = addrs[i];
++                char* end = begin + jump_result;
++                for (char* p = begin; p < end; p += 64) {
++                    __asm__ __volatile__("dc cvau, %0" : : "r"(p) : "memory");
++                }
++                __asm__ __volatile__("dsb ish" : : : "memory");
++                for (char* p = begin; p < end; p += 64) {
++                    __asm__ __volatile__("ic ivau, %0" : : "r"(p) : "memory");
++                }
++            }
++            __asm__ __volatile__("dsb ish" : : : "memory");
++            __asm__ __volatile__("isb" : : : "memory");
++            
+             entry->stealth = 0;
+             entry->original_size = jump_result;
+             hook_log("[patch_target] rw-sibling OK target=%p via writable=%p len=%d",

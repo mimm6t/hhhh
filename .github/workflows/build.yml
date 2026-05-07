@@ -20,6 +20,13 @@ jobs:
         path: rustFrida-master
         submodules: recursive
     
+    - name: Fix __clear_cache symbol issue
+      run: |
+        cd rustFrida-master
+        patch -p1 < ../patches/fix-clear-cache.patch
+        echo "=== Patch applied successfully ==="
+        grep -A 10 "void hook_flush_cache" quickjs-hook/src/hook_engine_mem.c | head -15
+    
     - name: Setup NDK
       uses: nttld/setup-ndk@v1
       with:
