@@ -1,59 +1,78 @@
-use actix_web::{web, App, HttpResponse, HttpServer, Result};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs;
 use std::process::Command;
-use std::sync::Mutex;
-use tokio::fs;
+use tiny_http::{Response, Server};
 
-const RUSTFRIDA_BIN: &str = "/data/adb/modules/rustfrida-kernelsu/bin/rustfrida";
 const SCRIPTS_DIR: &str = "/data/adb/rustfrida/scripts";
 const HOOKS_CONFIG: &str = "/data/adb/rustfrida/hooks.json";
-
-struct AppState {
-    output: Mutex<Vec<String>>,
-}
 
 #[derive(Serialize, Deserialize)]
 struct HooksConfig {
     enabled: Vec<String>,
-    hooks: std::collections::HashMap<String, String>,
+    hooks: HashMap<String, String>,
 }
 
-#[derive(Deserialize)]
-struct HookRequest {
-    package: String,
-    script: Option<String>,
+fn main() {
+    let server = Server::http("0.0.0.0:8080").unwrap();
+    println!("rustFrida Web UI listening on 0.0.0.0:8080");
+
+    for request in server.incoming_requests() {
+        let url = request.url().to_string();
+        
+        let response = if url == "/" {
+            Response::from_string(include_str!("index.html"))
+                .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html"[..]).unwrap())
+        } else if url == "/api/apps" {
+            handle_apps()
+        } else if url == "/api/scripts" {
+            handle_scripts()
+        } else if url.starts_with("/api/script/") && request.method().as_str() == "GET" {
+            let name = url.trim_start_matches("/api/script/");
+            handle_get_script(name)
+        } else if url == "/api/script/save" && request.method().as_str() == "POST" {
+            handle_save_script(&request)
+        } else if url == "/api/script/delete" && request.method().as_str() == "POST" {
+            handle_delete_script(&request)
+        } else if url == "/api/hooks" {
+            handle_get_hooks()
+        } else if url == "/api/hook/enable" && request.method().as_str() == "POST" {
+            handle_enable_hook(&request)
+        } else if url == "/api/hook/disable" && request.method().as_str() == "POST" {
+            handle_disable_hook(&request)
+        } else if url == "/api/output" {
+            Response::from_string(r#"{"output":""}"#)
+                .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap())
+        } else {
+            Response::from_string("Not Found").with_status_code(404)
+        };
+        
+        let _ = request.respond(response);
+    }
 }
 
-#[derive(Deserialize)]
-struct ScriptRequest {
-    name: String,
-    content: Option<String>,
-}
-
-async fn index() -> Result<HttpResponse> {
-    let html = include_str!("index.html");
-    Ok(HttpResponse::Ok().content_type("text/html").body(html))
-}
-
-async fn get_apps() -> Result<HttpResponse> {
+fn handle_apps() -> Response<std::io::Cursor<Vec<u8>>> {
     let output = Command::new("pm")
         .args(&["list", "packages", "-3"])
-        .output()
-        .map_err(|_| actix_web::error::ErrorInternalServerError("Failed to list apps"))?;
+        .output();
     
-    let packages: Vec<_> = String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .filter_map(|line| line.strip_prefix("package:"))
-        .map(|pkg| serde_json::json!({"package": pkg, "name": pkg}))
-        .collect();
+    let packages: Vec<_> = match output {
+        Ok(out) => String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .filter_map(|line| line.strip_prefix("package:"))
+            .map(|pkg| serde_json::json!({"package": pkg, "name": pkg}))
+            .collect(),
+        Err(_) => vec![],
+    };
     
-    Ok(HttpResponse::Ok().json(packages))
+    Response::from_string(serde_json::to_string(&packages).unwrap())
+        .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap())
 }
 
-async fn get_scripts() -> Result<HttpResponse> {
+fn handle_scripts() -> Response<std::io::Cursor<Vec<u8>>> {
     let mut scripts = Vec::new();
-    if let Ok(mut entries) = fs::read_dir(SCRIPTS_DIR).await {
-        while let Ok(Some(entry)) = entries.next_entry().await {
+    if let Ok(entries) = fs::read_dir(SCRIPTS_DIR) {
+        for entry in entries.flatten() {
             if let Some(name) = entry.file_name().to_str() {
                 if name.ends_with(".js") {
                     scripts.push(serde_json::json!({"name": name}));
@@ -61,127 +80,137 @@ async fn get_scripts() -> Result<HttpResponse> {
             }
         }
     }
-    Ok(HttpResponse::Ok().json(scripts))
+    Response::from_string(serde_json::to_string(&scripts).unwrap())
+        .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap())
 }
 
-async fn get_script(name: web::Path<String>) -> Result<HttpResponse> {
-    let path = format!("{}/{}", SCRIPTS_DIR, name.as_str());
-    match fs::read_to_string(&path).await {
-        Ok(content) => Ok(HttpResponse::Ok().json(serde_json::json!({"content": content}))),
-        Err(_) => Ok(HttpResponse::NotFound().json(serde_json::json!({"error": "Script not found"}))),
+fn handle_get_script(name: &str) -> Response<std::io::Cursor<Vec<u8>>> {
+    let path = format!("{}/{}", SCRIPTS_DIR, name);
+    match fs::read_to_string(&path) {
+        Ok(content) => Response::from_string(serde_json::json!({"content": content}).to_string())
+            .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap()),
+        Err(_) => Response::from_string(r#"{"error":"Not found"}"#).with_status_code(404)
+            .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap()),
     }
 }
 
-async fn save_script(req: web::Json<ScriptRequest>) -> Result<HttpResponse> {
-    let path = format!("{}/{}", SCRIPTS_DIR, req.name);
-    if let Some(content) = &req.content {
-        fs::write(&path, content).await
-            .map_err(|_| actix_web::error::ErrorInternalServerError("Failed to save script"))?;
+fn handle_save_script(request: &tiny_http::Request) -> Response<std::io::Cursor<Vec<u8>>> {
+    let mut content = String::new();
+    if let Err(_) = request.as_reader().read_to_string(&mut content) {
+        return Response::from_string(r#"{"success":false}"#)
+            .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap());
     }
-    Ok(HttpResponse::Ok().json(serde_json::json!({"success": true})))
-}
-
-async fn delete_script(req: web::Json<ScriptRequest>) -> Result<HttpResponse> {
-    let path = format!("{}/{}", SCRIPTS_DIR, req.name);
-    fs::remove_file(&path).await
-        .map_err(|_| actix_web::error::ErrorInternalServerError("Failed to delete script"))?;
-    Ok(HttpResponse::Ok().json(serde_json::json!({"success": true})))
-}
-
-async fn get_hooks() -> Result<HttpResponse> {
-    match fs::read_to_string(HOOKS_CONFIG).await {
-        Ok(content) => {
-            let config: HooksConfig = serde_json::from_str(&content).unwrap_or_else(|_| HooksConfig {
-                enabled: Vec::new(),
-                hooks: std::collections::HashMap::new(),
-            });
-            Ok(HttpResponse::Ok().json(config))
+    
+    if let Ok(req) = serde_json::from_str::<serde_json::Value>(&content) {
+        if let (Some(name), Some(script_content)) = (req["name"].as_str(), req["content"].as_str()) {
+            let path = format!("{}/{}", SCRIPTS_DIR, name);
+            if fs::write(&path, script_content).is_ok() {
+                return Response::from_string(r#"{"success":true}"#)
+                    .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap());
+            }
         }
-        Err(_) => Ok(HttpResponse::Ok().json(HooksConfig {
-            enabled: Vec::new(),
-            hooks: std::collections::HashMap::new(),
-        })),
     }
+    Response::from_string(r#"{"success":false}"#)
+        .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap())
 }
 
-async fn enable_hook(req: web::Json<HookRequest>) -> Result<HttpResponse> {
-    let mut config: HooksConfig = match fs::read_to_string(HOOKS_CONFIG).await {
-        Ok(content) => serde_json::from_str(&content).unwrap_or_else(|_| HooksConfig {
-            enabled: Vec::new(),
-            hooks: std::collections::HashMap::new(),
-        }),
-        Err(_) => HooksConfig {
-            enabled: Vec::new(),
-            hooks: std::collections::HashMap::new(),
-        },
-    };
-    
-    if !config.enabled.contains(&req.package) {
-        config.enabled.push(req.package.clone());
-    }
-    if let Some(script) = &req.script {
-        config.hooks.insert(req.package.clone(), script.clone());
+fn handle_delete_script(request: &tiny_http::Request) -> Response<std::io::Cursor<Vec<u8>>> {
+    let mut content = String::new();
+    if let Err(_) = request.as_reader().read_to_string(&mut content) {
+        return Response::from_string(r#"{"success":false}"#)
+            .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap());
     }
     
-    let json = serde_json::to_string_pretty(&config)
-        .map_err(|_| actix_web::error::ErrorInternalServerError("Failed to serialize config"))?;
-    fs::write(HOOKS_CONFIG, json).await
-        .map_err(|_| actix_web::error::ErrorInternalServerError("Failed to save config"))?;
-    
-    Ok(HttpResponse::Ok().json(serde_json::json!({"success": true})))
+    if let Ok(req) = serde_json::from_str::<serde_json::Value>(&content) {
+        if let Some(name) = req["name"].as_str() {
+            let path = format!("{}/{}", SCRIPTS_DIR, name);
+            if fs::remove_file(&path).is_ok() {
+                return Response::from_string(r#"{"success":true}"#)
+                    .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap());
+            }
+        }
+    }
+    Response::from_string(r#"{"success":false}"#)
+        .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap())
 }
 
-async fn disable_hook(req: web::Json<HookRequest>) -> Result<HttpResponse> {
-    let mut config: HooksConfig = match fs::read_to_string(HOOKS_CONFIG).await {
-        Ok(content) => serde_json::from_str(&content).unwrap_or_else(|_| HooksConfig {
+fn handle_get_hooks() -> Response<std::io::Cursor<Vec<u8>>> {
+    let config: HooksConfig = fs::read_to_string(HOOKS_CONFIG)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_else(|| HooksConfig {
             enabled: Vec::new(),
-            hooks: std::collections::HashMap::new(),
-        }),
-        Err(_) => HooksConfig {
-            enabled: Vec::new(),
-            hooks: std::collections::HashMap::new(),
-        },
-    };
+            hooks: HashMap::new(),
+        });
     
-    config.enabled.retain(|p| p != &req.package);
-    config.hooks.remove(&req.package);
-    
-    let json = serde_json::to_string_pretty(&config)
-        .map_err(|_| actix_web::error::ErrorInternalServerError("Failed to serialize config"))?;
-    fs::write(HOOKS_CONFIG, json).await
-        .map_err(|_| actix_web::error::ErrorInternalServerError("Failed to save config"))?;
-    
-    Ok(HttpResponse::Ok().json(serde_json::json!({"success": true})))
+    Response::from_string(serde_json::to_string(&config).unwrap())
+        .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap())
 }
 
-async fn get_output(data: web::Data<AppState>) -> Result<HttpResponse> {
-    let output = data.output.lock().unwrap();
-    Ok(HttpResponse::Ok().json(serde_json::json!({"output": output.join("\n")})))
+fn handle_enable_hook(request: &tiny_http::Request) -> Response<std::io::Cursor<Vec<u8>>> {
+    let mut content = String::new();
+    if let Err(_) = request.as_reader().read_to_string(&mut content) {
+        return Response::from_string(r#"{"success":false}"#)
+            .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap());
+    }
+    
+    if let Ok(req) = serde_json::from_str::<serde_json::Value>(&content) {
+        if let Some(package) = req["package"].as_str() {
+            let mut config: HooksConfig = fs::read_to_string(HOOKS_CONFIG)
+                .ok()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_else(|| HooksConfig {
+                    enabled: Vec::new(),
+                    hooks: HashMap::new(),
+                });
+            
+            if !config.enabled.contains(&package.to_string()) {
+                config.enabled.push(package.to_string());
+            }
+            if let Some(script) = req["script"].as_str() {
+                config.hooks.insert(package.to_string(), script.to_string());
+            }
+            
+            if let Ok(json) = serde_json::to_string_pretty(&config) {
+                if fs::write(HOOKS_CONFIG, json).is_ok() {
+                    return Response::from_string(r#"{"success":true}"#)
+                        .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap());
+                }
+            }
+        }
+    }
+    Response::from_string(r#"{"success":false}"#)
+        .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap())
 }
 
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
-    let state = web::Data::new(AppState {
-        output: Mutex::new(Vec::new()),
-    });
+fn handle_disable_hook(request: &tiny_http::Request) -> Response<std::io::Cursor<Vec<u8>>> {
+    let mut content = String::new();
+    if let Err(_) = request.as_reader().read_to_string(&mut content) {
+        return Response::from_string(r#"{"success":false}"#)
+            .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap());
+    }
     
-    println!("Starting rustFrida Web UI on 0.0.0.0:8080");
-    
-    HttpServer::new(move || {
-        App::new()
-            .app_data(state.clone())
-            .route("/", web::get().to(index))
-            .route("/api/apps", web::get().to(get_apps))
-            .route("/api/scripts", web::get().to(get_scripts))
-            .route("/api/script/{name}", web::get().to(get_script))
-            .route("/api/script/save", web::post().to(save_script))
-            .route("/api/script/delete", web::post().to(delete_script))
-            .route("/api/hooks", web::get().to(get_hooks))
-            .route("/api/hook/enable", web::post().to(enable_hook))
-            .route("/api/hook/disable", web::post().to(disable_hook))
-            .route("/api/output", web::get().to(get_output))
-    })
-    .bind("0.0.0.0:8080")?
-    .run()
-    .await
+    if let Ok(req) = serde_json::from_str::<serde_json::Value>(&content) {
+        if let Some(package) = req["package"].as_str() {
+            let mut config: HooksConfig = fs::read_to_string(HOOKS_CONFIG)
+                .ok()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_else(|| HooksConfig {
+                    enabled: Vec::new(),
+                    hooks: HashMap::new(),
+                });
+            
+            config.enabled.retain(|p| p != package);
+            config.hooks.remove(package);
+            
+            if let Ok(json) = serde_json::to_string_pretty(&config) {
+                if fs::write(HOOKS_CONFIG, json).is_ok() {
+                    return Response::from_string(r#"{"success":true}"#)
+                        .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap());
+                }
+            }
+        }
+    }
+    Response::from_string(r#"{"success":false}"#)
+        .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap())
 }
