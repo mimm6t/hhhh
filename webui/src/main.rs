@@ -31,6 +31,7 @@ fn main() {
             ("POST", "/api/script/delete") => delete_script(&mut request),
             ("POST", "/api/hook/enable") => enable_hook(&mut request),
             ("POST", "/api/hook/disable") => disable_hook(&mut request),
+            ("POST", "/api/inject") => inject_now(&mut request),
             _ => Response::from_string("Not Found").with_status_code(404),
         };
         
@@ -228,4 +229,54 @@ fn disable_hook(request: &mut tiny_http::Request) -> Response<std::io::Cursor<Ve
         }
     }
     json_response(r#"{"success":false}"#)
+}
+
+fn inject_now(request: &mut tiny_http::Request) -> Response<std::io::Cursor<Vec<u8>>> {
+    let body = match read_body(request) {
+        Ok(b) => b,
+        Err(_) => return json_response(r#"{"success":false,"error":"Failed to read body"}"#),
+    };
+    
+    let req: serde_json::Value = match serde_json::from_str(&body) {
+        Ok(v) => v,
+        Err(_) => return json_response(r#"{"success":false,"error":"Invalid JSON"}"#),
+    };
+    
+    if let (Some(package), Some(script)) = (req["package"].as_str(), req["script"].as_str()) {
+        let script_path = format!("{}/{}", SCRIPTS_DIR, script);
+        
+        // 检查脚本是否存在
+        if !std::path::Path::new(&script_path).exists() {
+            return json_response(r#"{"success":false,"error":"Script not found"}"#);
+        }
+        
+        // 使用 spawn 模式注入
+        let output = Command::new("/data/adb/modules/rustfrida-kernelsu/bin/rustfrida")
+            .args(&["--spawn", package, "-l", &script_path])
+            .output();
+        
+        match output {
+            Ok(out) => {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                let log = format!("stdout: {}\nstderr: {}", stdout, stderr);
+                
+                // 写入日志
+                let _ = fs::write("/data/adb/modules/rustfrida-kernelsu/logs/inject.log", &log);
+                
+                if out.status.success() {
+                    json_response(r#"{"success":true,"message":"Injection started"}"#)
+                } else {
+                    let error = format!(r#"{{"success":false,"error":"{}"}}"#, stderr.replace('"', "\\\""));
+                    json_response(&error)
+                }
+            }
+            Err(e) => {
+                let error = format!(r#"{{"success":false,"error":"{}"}}"#, e.to_string().replace('"', "\\\""));
+                json_response(&error)
+            }
+        }
+    } else {
+        json_response(r#"{"success":false,"error":"Missing package or script"}"#)
+    }
 }
