@@ -92,11 +92,18 @@ fn get_hooks() -> Response<std::io::Cursor<Vec<u8>>> {
 fn get_logs() -> Response<std::io::Cursor<Vec<u8>>> {
     let mut logs = Vec::new();
     
+    // inject.log - 最重要，放最前面
+    if let Ok(content) = fs::read_to_string("/data/adb/modules/rustfrida-kernelsu/logs/inject.log") {
+        let lines: Vec<&str> = content.lines().collect();
+        let start = if lines.len() > 100 { lines.len() - 100 } else { 0 };
+        logs.push(format!("=== inject.log (last 100 lines) ===\n{}", lines[start..].join("\n")));
+    }
+    
     // rustfrida.log - 最后50行
     if let Ok(content) = fs::read_to_string("/data/adb/modules/rustfrida-kernelsu/logs/rustfrida.log") {
         let lines: Vec<&str> = content.lines().collect();
         let start = if lines.len() > 50 { lines.len() - 50 } else { 0 };
-        logs.push(format!("=== rustfrida.log (last 50 lines) ===\n{}", lines[start..].join("\n")));
+        logs.push(format!("\n=== rustfrida.log (last 50 lines) ===\n{}", lines[start..].join("\n")));
     }
     
     // auto-hook.log
@@ -232,51 +239,100 @@ fn disable_hook(request: &mut tiny_http::Request) -> Response<std::io::Cursor<Ve
 }
 
 fn inject_now(request: &mut tiny_http::Request) -> Response<std::io::Cursor<Vec<u8>>> {
+    use std::io::Write;
+    
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    
+    let mut log_file = match fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/data/adb/modules/rustfrida-kernelsu/logs/inject.log") {
+        Ok(f) => f,
+        Err(e) => {
+            return json_response(&format!(r#"{{"success":false,"error":"Cannot open log: {}"}}"#, e));
+        }
+    };
+    
+    let _ = writeln!(log_file, "\n[{}] ===== Injection Request =====", timestamp);
+    
     let body = match read_body(request) {
-        Ok(b) => b,
-        Err(_) => return json_response(r#"{"success":false,"error":"Failed to read body"}"#),
+        Ok(b) => {
+            let _ = writeln!(log_file, "[{}] Request body: {}", timestamp, b);
+            b
+        },
+        Err(_) => {
+            let _ = writeln!(log_file, "[{}] ERROR: Failed to read body", timestamp);
+            return json_response(r#"{"success":false,"error":"Failed to read body"}"#);
+        }
     };
     
     let req: serde_json::Value = match serde_json::from_str(&body) {
-        Ok(v) => v,
-        Err(_) => return json_response(r#"{"success":false,"error":"Invalid JSON"}"#),
+        Ok(v) => {
+            let _ = writeln!(log_file, "[{}] Parsed JSON: {:?}", timestamp, v);
+            v
+        },
+        Err(e) => {
+            let _ = writeln!(log_file, "[{}] ERROR: Invalid JSON: {}", timestamp, e);
+            return json_response(r#"{"success":false,"error":"Invalid JSON"}"#);
+        }
     };
     
     if let (Some(package), Some(script)) = (req["package"].as_str(), req["script"].as_str()) {
+        let _ = writeln!(log_file, "[{}] Package: {}", timestamp, package);
+        let _ = writeln!(log_file, "[{}] Script: {}", timestamp, script);
+        
         let script_path = format!("{}/{}", SCRIPTS_DIR, script);
+        let _ = writeln!(log_file, "[{}] Script path: {}", timestamp, script_path);
         
         // 检查脚本是否存在
         if !std::path::Path::new(&script_path).exists() {
+            let _ = writeln!(log_file, "[{}] ERROR: Script not found at {}", timestamp, script_path);
             return json_response(r#"{"success":false,"error":"Script not found"}"#);
         }
         
+        let _ = writeln!(log_file, "[{}] Script exists, starting injection...", timestamp);
+        
+        let rustfrida_bin = "/data/adb/modules/rustfrida-kernelsu/bin/rustfrida";
+        let args = vec!["--spawn", package, "-l", &script_path];
+        
+        let _ = writeln!(log_file, "[{}] Command: {} {:?}", timestamp, rustfrida_bin, args);
+        
         // 使用 spawn 模式注入
-        let output = Command::new("/data/adb/modules/rustfrida-kernelsu/bin/rustfrida")
-            .args(&["--spawn", package, "-l", &script_path])
+        let output = Command::new(rustfrida_bin)
+            .args(&args)
             .output();
         
         match output {
             Ok(out) => {
                 let stdout = String::from_utf8_lossy(&out.stdout);
                 let stderr = String::from_utf8_lossy(&out.stderr);
-                let log = format!("stdout: {}\nstderr: {}", stdout, stderr);
+                let status = out.status.code().unwrap_or(-1);
                 
-                // 写入日志
-                let _ = fs::write("/data/adb/modules/rustfrida-kernelsu/logs/inject.log", &log);
+                let _ = writeln!(log_file, "[{}] Exit code: {}", timestamp, status);
+                let _ = writeln!(log_file, "[{}] STDOUT:\n{}", timestamp, stdout);
+                let _ = writeln!(log_file, "[{}] STDERR:\n{}", timestamp, stderr);
                 
                 if out.status.success() {
+                    let _ = writeln!(log_file, "[{}] SUCCESS: Injection completed", timestamp);
                     json_response(r#"{"success":true,"message":"Injection started"}"#)
                 } else {
-                    let error = format!(r#"{{"success":false,"error":"{}"}}"#, stderr.replace('"', "\\\""));
+                    let _ = writeln!(log_file, "[{}] FAILED: Injection failed", timestamp);
+                    let error = format!(r#"{{"success":false,"error":"Exit code {}: {}"}}"#, 
+                        status, stderr.replace('"', "\\\"").replace('\n', " "));
                     json_response(&error)
                 }
             }
             Err(e) => {
+                let _ = writeln!(log_file, "[{}] ERROR: Failed to execute: {}", timestamp, e);
                 let error = format!(r#"{{"success":false,"error":"{}"}}"#, e.to_string().replace('"', "\\\""));
                 json_response(&error)
             }
         }
     } else {
+        let _ = writeln!(log_file, "[{}] ERROR: Missing package or script in request", timestamp);
         json_response(r#"{"success":false,"error":"Missing package or script"}"#)
     }
 }
