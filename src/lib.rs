@@ -1,42 +1,34 @@
-/// Hide-My-Applist Rust Implementation
-/// 
-/// A kernel-level app hiding solution using wxshadow + rustFrida
-/// 
-/// This is a rewrite of Hide-My-Applist using wxshadow kernel module
-/// for stealthy hooking instead of Xposed framework.
-
-pub mod wxshadow;
-pub mod config;
-pub mod process;
-pub mod hook;
-pub mod advanced_hook;
-pub mod elf;
-pub mod symbol;
+/// Hide-My-Applist Rust - Real Frida-based Hook Implementation
 pub mod android;
-pub mod pms_hook;
+pub mod config;
+pub mod frida_hook;
 
 #[cfg(feature = "android")]
 pub mod jni;
 
+// Re-export main types
+pub use android::AndroidVersion;
 pub use config::Config;
-pub use hook::PmsHookEngine;
+pub use frida_hook::FridaHookEngine as PmsHookEngine;
 
-/// Library version
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+#[cfg(target_os = "android")]
+use android_logger::{Config as LogConfig, FilterBuilder};
 
-/// Initialize logging
+/// Initialize logging for Android
+#[cfg(target_os = "android")]
 pub fn init_logging() {
-    env_logger::Builder::from_default_env()
-        .filter_level(log::LevelFilter::Info)
-        .init();
+    android_logger::init_once(
+        LogConfig::default()
+            .with_max_level(log::LevelFilter::Debug)
+            .with_tag("HMA-Rust")
+            .with_filter(FilterBuilder::new().parse("debug").build()),
+    );
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_version() {
-        assert!(!VERSION.is_empty());
-    }
+/// Initialize logging for desktop
+#[cfg(not(target_os = "android"))]
+pub fn init_logging() {
+    env_logger::Builder::from_default_env()
+        .filter_level(log::LevelFilter::Debug)
+        .init();
 }

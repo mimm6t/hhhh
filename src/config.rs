@@ -1,177 +1,168 @@
 /// Configuration management for Hide-My-Applist
-/// 
-/// Manages app hiding rules, templates, and scope configuration
-
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use std::fs;
-use std::path::Path;
-use anyhow::{Context, Result};
+use std::collections::HashSet;
 
-/// Application configuration for hiding
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppConfig {
-    /// Use whitelist mode (hide all except listed)
-    pub use_whitelist: bool,
-    
-    /// Exclude system apps from hiding
-    pub exclude_system_apps: bool,
-    
-    /// Extra app list (blacklist or whitelist depending on mode)
-    pub extra_app_list: HashSet<String>,
-    
-    /// Template names to apply
-    pub apply_templates: Vec<String>,
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            use_whitelist: false,
-            exclude_system_apps: true,
-            extra_app_list: HashSet::new(),
-            apply_templates: Vec::new(),
-        }
-    }
-}
-
-/// Template for app hiding rules
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Template {
-    /// Template name
-    pub name: String,
-    
-    /// Apps in this template
-    pub app_list: HashSet<String>,
-}
-
-/// Main configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
-    /// Configuration version
-    pub config_version: u32,
+    /// List of package names to hide
+    pub hidden_apps: HashSet<String>,
     
-    /// Enable detailed logging
-    pub detail_log: bool,
+    /// List of process names that should see filtered results
+    pub scopes: HashSet<String>,
     
-    /// Maximum log size in KB
-    pub max_log_size: usize,
+    /// Templates for quick configuration
+    pub templates: Vec<Template>,
     
-    /// Scope: package name -> app config
-    pub scope: HashMap<String, AppConfig>,
+    /// Whether to enable verbose logging
+    pub verbose_logging: bool,
     
-    /// Templates
-    pub templates: HashMap<String, Template>,
+    /// Whether to hide system apps
+    pub hide_system_apps: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Template {
+    pub name: String,
+    pub description: String,
+    pub hidden_apps: HashSet<String>,
+    pub scopes: HashSet<String>,
 }
 
 impl Default for Config {
     fn default() -> Self {
+        let mut scopes = HashSet::new();
+        // Default scopes - common apps that check for other apps
+        scopes.insert("com.android.vending".to_string()); // Google Play Store
+        scopes.insert("com.google.android.gms".to_string()); // Google Play Services
+        scopes.insert("com.android.packageinstaller".to_string()); // Package Installer
+        
         Self {
-            config_version: 1,
-            detail_log: false,
-            max_log_size: 1024,
-            scope: HashMap::new(),
-            templates: HashMap::new(),
+            hidden_apps: HashSet::new(),
+            scopes,
+            templates: Vec::new(),
+            verbose_logging: false,
+            hide_system_apps: false,
         }
     }
 }
 
 impl Config {
-    /// Load configuration from JSON file
-    pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let content = fs::read_to_string(path.as_ref())
-            .context("Failed to read config file")?;
-        let config: Config = serde_json::from_str(&content)
-            .context("Failed to parse config JSON")?;
-        Ok(config)
+    /// Create a new empty configuration
+    pub fn new() -> Self {
+        Self::default()
     }
     
-    /// Save configuration to JSON file
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let json = serde_json::to_string_pretty(self)
-            .context("Failed to serialize config")?;
-        fs::write(path.as_ref(), json)
-            .context("Failed to write config file")?;
-        Ok(())
+    /// Add an app to the hidden list
+    pub fn hide_app(&mut self, package_name: String) {
+        self.hidden_apps.insert(package_name);
     }
     
-    /// Check if hook is enabled for a package
-    pub fn is_hook_enabled(&self, package: &str) -> bool {
-        self.scope.contains_key(package)
+    /// Remove an app from the hidden list
+    pub fn show_app(&mut self, package_name: &str) {
+        self.hidden_apps.remove(package_name);
     }
     
-    /// Determine if target app should be hidden from caller
-    pub fn should_hide(&self, caller: &str, target: &str, system_apps: &HashSet<String>) -> bool {
-        // Don't hide from self
-        if caller == target {
-            return false;
+    /// Check if an app is hidden
+    pub fn is_app_hidden(&self, package_name: &str) -> bool {
+        self.hidden_apps.contains(package_name)
+    }
+    
+    /// Add a scope (process that should see filtered results)
+    pub fn add_scope(&mut self, process_name: String) {
+        self.scopes.insert(process_name);
+    }
+    
+    /// Remove a scope
+    pub fn remove_scope(&mut self, process_name: &str) {
+        self.scopes.remove(process_name);
+    }
+    
+    /// Check if a process is in scope
+    pub fn is_in_scope(&self, process_name: &str) -> bool {
+        self.scopes.iter().any(|scope| process_name.contains(scope))
+    }
+    
+    /// Add a template
+    pub fn add_template(&mut self, template: Template) {
+        self.templates.push(template);
+    }
+    
+    /// Remove a template by name
+    pub fn remove_template(&mut self, name: &str) {
+        self.templates.retain(|t| t.name != name);
+    }
+    
+    /// Apply a template to current config
+    pub fn apply_template(&mut self, template_name: &str) -> Result<(), String> {
+        if let Some(template) = self.templates.iter().find(|t| t.name == template_name) {
+            self.hidden_apps.extend(template.hidden_apps.clone());
+            self.scopes.extend(template.scopes.clone());
+            Ok(())
+        } else {
+            Err(format!("Template '{}' not found", template_name))
         }
-        
-        // Get caller's config
-        let app_config = match self.scope.get(caller) {
-            Some(cfg) => cfg,
-            None => return false,
-        };
-        
-        // Check if target is system app and should be excluded
-        if app_config.use_whitelist && app_config.exclude_system_apps && system_apps.contains(target) {
-            return false;
-        }
-        
-        // Check extra app list
-        if app_config.extra_app_list.contains(target) {
-            return !app_config.use_whitelist;
-        }
-        
-        // Check templates
-        for template_name in &app_config.apply_templates {
-            if let Some(template) = self.templates.get(template_name) {
-                if template.app_list.contains(target) {
-                    return !app_config.use_whitelist;
-                }
-            }
-        }
-        
-        // Default: hide if whitelist mode, show if blacklist mode
-        app_config.use_whitelist
-    }
-}
-
-/// Packages that should never be hidden
-pub const PACKAGES_SHOULD_NOT_HIDE: &[&str] = &[
-    "android",
-    "com.android.systemui",
-];
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    
-    #[test]
-    fn test_should_hide_blacklist() {
-        let mut config = Config::default();
-        let mut app_config = AppConfig::default();
-        app_config.use_whitelist = false;
-        app_config.extra_app_list.insert("com.example.hidden".to_string());
-        config.scope.insert("com.example.caller".to_string(), app_config);
-        
-        let system_apps = HashSet::new();
-        
-        assert!(config.should_hide("com.example.caller", "com.example.hidden", &system_apps));
-        assert!(!config.should_hide("com.example.caller", "com.example.visible", &system_apps));
     }
     
-    #[test]
-    fn test_should_hide_whitelist() {
-        let mut config = Config::default();
-        let mut app_config = AppConfig::default();
-        app_config.use_whitelist = true;
-        app_config.extra_app_list.insert("com.example.visible".to_string());
-        config.scope.insert("com.example.caller".to_string(), app_config);
-        
-        let system_apps = HashSet::new();
-        
-        assert!(!config.should_hide("com.example.caller", "com.example.visible", &system_apps));
-        assert!(config.should_hide("com.example.caller", "com.example.hidden", &system_apps));
+    /// Get default templates
+    pub fn get_default_templates() -> Vec<Template> {
+        vec![
+            Template {
+                name: "Banking Apps".to_string(),
+                description: "Hide from banking and financial apps".to_string(),
+                hidden_apps: [
+                    "com.topjohnwu.magisk",
+                    "com.android.shell",
+                    "eu.chainfire.supersu",
+                ].iter().map(|s| s.to_string()).collect(),
+                scopes: [
+                    "com.chase.sig.android",
+                    "com.bankofamerica.angelapp",
+                    "com.paypal.android.p2pmobile",
+                ].iter().map(|s| s.to_string()).collect(),
+            },
+            Template {
+                name: "Gaming Apps".to_string(),
+                description: "Hide from gaming and anti-cheat apps".to_string(),
+                hidden_apps: [
+                    "com.topjohnwu.magisk",
+                    "de.robv.android.xposed.installer",
+                    "com.android.shell",
+                ].iter().map(|s| s.to_string()).collect(),
+                scopes: [
+                    "com.miHoYo.GenshinImpact",
+                    "com.pubg.imobile",
+                    "com.tencent.ig",
+                ].iter().map(|s| s.to_string()).collect(),
+            },
+            Template {
+                name: "Work Profile".to_string(),
+                description: "Hide from work and enterprise apps".to_string(),
+                hidden_apps: [
+                    "com.topjohnwu.magisk",
+                    "com.android.shell",
+                    "eu.chainfire.supersu",
+                ].iter().map(|s| s.to_string()).collect(),
+                scopes: [
+                    "com.microsoft.office.outlook",
+                    "com.slack",
+                    "com.google.android.apps.work.clouddpc",
+                ].iter().map(|s| s.to_string()).collect(),
+            },
+        ]
+    }
+    
+    /// Load default templates into config
+    pub fn load_default_templates(&mut self) {
+        self.templates = Self::get_default_templates();
+    }
+    
+    /// Serialize to JSON string
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string_pretty(self)
+    }
+    
+    /// Deserialize from JSON string
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
     }
 }
