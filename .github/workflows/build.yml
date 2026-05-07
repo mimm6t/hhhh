@@ -34,6 +34,7 @@ jobs:
     - name: Setup Rust nightly for eBPF
       uses: dtolnay/rust-toolchain@nightly
       with:
+        targets: aarch64-linux-android
         components: rust-src
     
     - name: Install bpf-linker
