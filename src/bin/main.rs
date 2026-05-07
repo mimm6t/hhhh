@@ -1,145 +1,98 @@
-/// Hide-My-Applist Rust - Main Entry Point
-/// 
-/// Command-line tool for managing app hiding
+/// Hide-My-Applist Rust CLI
+use anyhow::Result;
+use hide_my_applist_rust::{Config, PmsHookEngine, init_logging};
+use std::env;
 
-use hide_my_applist_rust::{Config, PmsHookEngine};
-use anyhow::{Context, Result};
-use std::path::PathBuf;
+const VERSION: &str = "0.2.0";
 
 fn main() -> Result<()> {
-    hide_my_applist_rust::init_logging();
+    init_logging();
     
-    let args: Vec<String> = std::env::args().collect();
+    let args: Vec<String> = env::args().collect();
     
-    if args.len() < 2 {
-        print_usage();
-        return Ok(());
-    }
-    
-    match args[1].as_str() {
-        "install" => install_hooks(&args[2..])?,
-        "uninstall" => uninstall_hooks()?,
-        "config" => manage_config(&args[2..])?,
-        "test" => test_wxshadow()?,
-        "version" => print_version(),
+    match args.get(1).map(|s| s.as_str()) {
+        Some("version") | Some("-v") | Some("--version") => {
+            println!("Hide-My-Applist Rust v{}", VERSION);
+            Ok(())
+        }
+        Some("help") | Some("-h") | Some("--help") => {
+            print_help();
+            Ok(())
+        }
+        Some("test") => {
+            test_hook_engine()
+        }
+        Some("config") => {
+            show_config()
+        }
         _ => {
-            eprintln!("Unknown command: {}", args[1]);
-            print_usage();
+            println!("Hide-My-Applist Rust v{}", VERSION);
+            println!("A Frida-based app hiding tool for Android");
+            println!();
+            println!("Usage: hma-rust [COMMAND]");
+            println!();
+            println!("Commands:");
+            println!("  version    Show version information");
+            println!("  help       Show this help message");
+            println!("  test       Test hook engine");
+            println!("  config     Show default configuration");
+            Ok(())
         }
     }
-    
-    Ok(())
 }
 
-fn print_usage() {
-    println!("Hide-My-Applist Rust v{}", hide_my_applist_rust::VERSION);
+fn print_help() {
+    println!("Hide-My-Applist Rust v{}", VERSION);
+    println!("A Frida-based app hiding tool for Android");
     println!();
     println!("USAGE:");
-    println!("  hma-rust install [config_path]  - Install hooks with config");
-    println!("  hma-rust uninstall              - Uninstall all hooks");
-    println!("  hma-rust config <path>          - Load and validate config");
-    println!("  hma-rust test                   - Test wxshadow availability");
-    println!("  hma-rust version                - Print version");
+    println!("    hma-rust [COMMAND]");
+    println!();
+    println!("COMMANDS:");
+    println!("    version    Show version information");
+    println!("    help       Show this help message");
+    println!("    test       Test hook engine initialization");
+    println!("    config     Show default configuration");
+    println!();
+    println!("EXAMPLES:");
+    println!("    hma-rust version");
+    println!("    hma-rust test");
+    println!("    hma-rust config");
 }
 
-fn print_version() {
-    println!("Hide-My-Applist Rust v{}", hide_my_applist_rust::VERSION);
-}
-
-fn install_hooks(args: &[String]) -> Result<()> {
-    let config_path = if args.is_empty() {
-        PathBuf::from("/data/local/tmp/hma_config.json")
-    } else {
-        PathBuf::from(&args[0])
-    };
+fn test_hook_engine() -> Result<()> {
+    println!("Testing Hook Engine...");
     
-    log::info!("Loading configuration from {:?}", config_path);
-    let config = if config_path.exists() {
-        Config::load(&config_path)?
-    } else {
-        log::warn!("Config file not found, using default");
-        Config::default()
-    };
+    let config = Config::new();
+    println!("✓ Config created");
     
-    log::info!("Initializing hook engine...");
     let mut engine = PmsHookEngine::new(config);
-    engine.init()?;
+    println!("✓ Hook engine created");
     
-    log::info!("Installing hooks...");
-    engine.install_hooks()?;
-    
-    log::info!("Hooks installed successfully!");
-    log::info!("Press Ctrl+C to uninstall and exit");
-    
-    // Keep running until interrupted
-    let running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
-    let r = running.clone();
-    
-    ctrlc::set_handler(move || {
-        r.store(false, std::sync::atomic::Ordering::SeqCst);
-    }).context("Failed to set Ctrl+C handler")?;
-    
-    while running.load(std::sync::atomic::Ordering::SeqCst) {
-        std::thread::sleep(std::time::Duration::from_secs(1));
+    match engine.init() {
+        Ok(_) => println!("✓ Hook engine initialized"),
+        Err(e) => println!("✗ Hook engine init failed: {}", e),
     }
     
-    log::info!("Uninstalling hooks...");
-    engine.uninstall_hooks()?;
+    #[cfg(feature = "frida-gum")]
+    println!("✓ Frida-Gum support enabled");
     
+    #[cfg(not(feature = "frida-gum"))]
+    println!("⚠ Frida-Gum support disabled");
+    
+    println!("Hook engine test completed");
     Ok(())
 }
 
-fn uninstall_hooks() -> Result<()> {
-    log::info!("Uninstalling hooks...");
-    // In a real implementation, we would need to track active hooks
-    // and clean them up properly
-    log::info!("Hooks uninstalled");
-    Ok(())
-}
-
-fn manage_config(args: &[String]) -> Result<()> {
-    if args.is_empty() {
-        anyhow::bail!("Config path required");
-    }
+fn show_config() -> Result<()> {
+    println!("Default Configuration:");
     
-    let config_path = PathBuf::from(&args[0]);
+    let mut config = Config::new();
+    config.load_default_templates();
     
-    if config_path.exists() {
-        log::info!("Loading config from {:?}", config_path);
-        let config = Config::load(&config_path)?;
-        log::info!("Config loaded successfully");
-        log::info!("  Version: {}", config.config_version);
-        log::info!("  Scope entries: {}", config.scope.len());
-        log::info!("  Templates: {}", config.templates.len());
-    } else {
-        log::info!("Creating default config at {:?}", config_path);
-        let config = Config::default();
-        config.save(&config_path)?;
-        log::info!("Default config created");
-    }
-    
-    Ok(())
-}
-
-fn test_wxshadow() -> Result<()> {
-    use hide_my_applist_rust::wxshadow;
-    
-    log::info!("Testing wxshadow availability...");
-    
-    // Try to set a dummy breakpoint (will fail if wxshadow not loaded)
-    let result = wxshadow::set_breakpoint(1, 0x1000);
-    
-    match result {
-        Ok(_) => {
-            log::info!("✓ wxshadow is available");
-            // Clean up
-            let _ = wxshadow::delete_breakpoint(1, 0x1000);
-        }
-        Err(e) => {
-            log::error!("✗ wxshadow is NOT available: {}", e);
-            log::error!("Make sure wxshadow.kpm is loaded:");
-            log::error!("  kpatch module load /path/to/wxshadow.kpm");
-        }
+    match config.to_json() {
+        Ok(json) => println!("{}", json),
+        Err(e) => println!("Error serializing config: {}", e),
     }
     
     Ok(())

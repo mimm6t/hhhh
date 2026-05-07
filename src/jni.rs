@@ -59,7 +59,7 @@ pub extern "system" fn Java_com_hma_rust_native_HmaCore_uninstallHook(
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_hma_rust_native_HmaCore_getStatus(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass
 ) -> jstring {
     let status = r#"{"active":true,"filter_count":0}"#;
