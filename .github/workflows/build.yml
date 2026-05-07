@@ -24,6 +24,7 @@ jobs:
       uses: nttld/setup-ndk@v1
       with:
         ndk-version: r25c
+      id: setup-ndk
     
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
@@ -36,13 +37,20 @@ jobs:
         python-version: '3.11'
     
     - name: Build loader
-      run: cd rustFrida-master/loader && python3 build_helpers.py
+      run: |
+        export ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}
+        export NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}
+        cd rustFrida-master/loader && python3 build_helpers.py
     
     - name: Build agent
-      run: cd rustFrida-master && cargo build -p agent --release
+      run: |
+        export ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}
+        cd rustFrida-master && cargo build -p agent --release
     
     - name: Build rustfrida
-      run: cd rustFrida-master && cargo build -p rust_frida --release
+      run: |
+        export ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}
+        cd rustFrida-master && cargo build -p rust_frida --release
     
     - name: Package module
       run: |
