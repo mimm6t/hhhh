@@ -7,7 +7,7 @@ use crate::{Config, PmsHookEngine};
 static mut ENGINE: Option<PmsHookEngine> = None;
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_com_hma_native_HmaCore_init(
+pub extern "system" fn Java_com_hma_rust_native_HmaCore_init(
     _env: JNIEnv,
     _class: JClass
 ) -> jint {
@@ -15,8 +15,8 @@ pub extern "system" fn Java_com_hma_native_HmaCore_init(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_com_hma_native_HmaCore_installHook(
-    mut env: JNIEnv,
+pub extern "system" fn Java_com_hma_rust_native_HmaCore_installHook(
+    env: JNIEnv,
     _class: JClass,
     config_json: JString
 ) -> jint {
@@ -45,7 +45,7 @@ pub extern "system" fn Java_com_hma_native_HmaCore_installHook(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_com_hma_native_HmaCore_uninstallHook(
+pub extern "system" fn Java_com_hma_rust_native_HmaCore_uninstallHook(
     _env: JNIEnv,
     _class: JClass
 ) -> jint {
@@ -58,8 +58,8 @@ pub extern "system" fn Java_com_hma_native_HmaCore_uninstallHook(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_com_hma_native_HmaCore_getStatus(
-    mut env: JNIEnv,
+pub extern "system" fn Java_com_hma_rust_native_HmaCore_getStatus(
+    env: JNIEnv,
     _class: JClass
 ) -> jstring {
     let status = r#"{"active":true,"filter_count":0}"#;
@@ -68,10 +68,17 @@ pub extern "system" fn Java_com_hma_native_HmaCore_getStatus(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_com_hma_native_HmaCore_testWxshadow(
+pub extern "system" fn Java_com_hma_rust_native_HmaCore_testFrida(
     _env: JNIEnv,
     _class: JClass
 ) -> jboolean {
-    use crate::wxshadow;
-    wxshadow::set_breakpoint(1, 0x1000).is_ok() as jboolean
+    // Test if Frida-Gum is available
+    #[cfg(feature = "frida-gum")]
+    {
+        true as jboolean
+    }
+    #[cfg(not(feature = "frida-gum"))]
+    {
+        false as jboolean
+    }
 }

@@ -1,13 +1,11 @@
 /// Real Hook Engine using Frida-Gum
-use anyhow::{Context, Result};
-use log::{debug, info, warn, error};
-use std::ffi::{CStr, CString};
-use std::ptr;
+use anyhow::Result;
+use log::{info, warn};
 
 #[cfg(feature = "frida-gum")]
 use frida_gum::{Gum, Interceptor, InvocationListener, InvocationContext};
 
-use crate::{Config, AndroidVersion};
+use crate::Config;
 
 pub struct FridaHookEngine {
     config: Config,
@@ -115,14 +113,14 @@ impl FridaHookEngine {
         Ok(())
     }
     
-    fn find_symbol(&self, lib_name: &str, symbol_name: &str) -> Option<u64> {
+    fn find_symbol(&self, _lib_name: &str, _symbol_name: &str) -> Option<u64> {
         #[cfg(feature = "frida-gum")]
         {
             use frida_gum::{Module, ModuleMap};
             
             let module_map = ModuleMap::new();
-            if let Some(module) = module_map.find_by_name(lib_name) {
-                if let Some(symbol) = module.find_export_by_name(symbol_name) {
+            if let Some(module) = module_map.find_by_name(_lib_name) {
+                if let Some(symbol) = module.find_export_by_name(_symbol_name) {
                     return Some(symbol.address().0 as u64);
                 }
             }
